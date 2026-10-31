@@ -101,14 +101,8 @@ function renderPieCallouts(slices, total) {
 
   Object.entries(sides).forEach(([side, sideItems]) => {
     const isRight = side === "right";
-    const baseRailX = isRight ? PIE.cx + PIE.rx * 1.3 + 10 : PIE.cx - PIE.rx * 1.3 - 10;
     const labelX = isRight ? 507 : 93;
-    distributeCallouts(sideItems).forEach(({ item, anchor, labelY }, index) => {
-      const railX = baseRailX + (isRight ? 1 : -1) * index * 3;
-      const outer = {
-        x: PIE.cx + (anchor.x - PIE.cx) * 1.3,
-        y: PIE.cy + (anchor.y - PIE.cy) * 1.3,
-      };
+    distributeCallouts(sideItems).forEach(({ item, anchor, labelY }) => {
       const percentage = total > 0 ? item.value * 100 / total : 0;
       const label = makeSvgElement("text", {
         x: labelX,
@@ -120,7 +114,8 @@ function renderPieCallouts(slices, total) {
       layer.append(label);
       const labelWidth = label.getComputedTextLength();
       layer.removeChild(label);
-      const lineEndX = isRight ? labelX + labelWidth + 4 : labelX - labelWidth - 4;
+      const nearX = isRight ? labelX - 4 : labelX + 4;
+      const farX = isRight ? labelX + labelWidth + 4 : labelX - labelWidth - 4;
       const lineY = labelY + 7;
       const detail = makeSvgElement("text", {
         x: labelX,
@@ -129,22 +124,18 @@ function renderPieCallouts(slices, total) {
         "text-anchor": isRight ? "start" : "end",
       });
       detail.textContent = `${percentage.toFixed(1)}% · ${((item.value || 0) / (1024 ** 3)).toFixed(1)} GB`;
-      callouts.push({ anchor, outer, railX, lineEndX, lineY, label, detail });
+      callouts.push({ anchor, nearX, farX, lineY, label, detail });
     });
   });
 
-  callouts.forEach(({ anchor, outer, railX, lineEndX, lineY }) => {
+  callouts.forEach(({ anchor, nearX, farX, lineY }) => {
     layer.append(makeSvgElement("path", {
-      d: `M ${anchor.x} ${anchor.y} L ${outer.x} ${outer.y} L ${railX} ${outer.y} L ${railX} ${lineY} L ${lineEndX} ${lineY}`,
+      d: `M ${farX} ${lineY} L ${nearX} ${lineY}`,
       class: "pie-callout-line",
     }));
-  });
-  callouts.forEach(({ anchor }) => {
-    layer.append(makeSvgElement("circle", {
-      cx: anchor.x,
-      cy: anchor.y,
-      r: 2.4,
-      class: "pie-callout-dot",
+    layer.append(makeSvgElement("path", {
+      d: `M ${nearX} ${lineY} L ${anchor.x} ${anchor.y}`,
+      class: "pie-callout-line",
     }));
   });
   callouts.forEach(({ label, detail }) => layer.append(label, detail));

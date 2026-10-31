@@ -77,7 +77,6 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 650; letter-spac
 .pie-side { stroke: var(--text); stroke-width: .8; stroke-linejoin: round; }
 .pie-slice { stroke: var(--text); stroke-width: 1.1; stroke-linejoin: round; }
 .pie-callout-line { fill: none; stroke: var(--muted); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
-.pie-callout-dot { fill: var(--surface); stroke: var(--text); stroke-width: 1.2; }
 .pie-callout-label { fill: var(--text); stroke: var(--surface); stroke-width: 3; paint-order: stroke; font-size: 10px; font-weight: 650; dominant-baseline: middle; }
 .pie-callout-detail { fill: var(--muted); stroke: var(--surface); stroke-width: 2.4; paint-order: stroke; font-size: 7.5px; dominant-baseline: middle; }
 .breakdown-note { max-width: 900px; margin: 0 auto; color: var(--muted); font-size: 10px; line-height: 1.5; }

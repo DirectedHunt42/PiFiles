@@ -1,6 +1,6 @@
 <p align="center"><img src="static/favicon.svg" alt="PiFiles favicon" width="64"></p>
 
-# PiFiles 0.4.4
+# PiFiles 0.4.5
 
 PiFiles turns a Raspberry Pi or Debian server into a local file share with a browser dashboard for storage and system health. Shared files are kept in their own directory, separate from the application repository.
 
