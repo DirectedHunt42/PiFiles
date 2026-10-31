@@ -13,13 +13,13 @@ const setMeter = (id, value) => {
 };
 
 const STORAGE_LEGEND = [
-  { id: "system", label: "System files", short: "System" },
-  { id: "other_repos", label: "Other repos", short: "Repos" },
-  { id: "this_repo", label: "This repo", short: "Repo" },
-  { id: "unrelated", label: "Unrelated files", short: "Other" },
-  { id: "stored", label: "Stored files", short: "Stored" },
-  { id: "unclassified", label: "Unclassified", short: "Unknown" },
-  { id: "empty", label: "Empty space", short: "Free" },
+  { id: "system", label: "System files" },
+  { id: "other_repos", label: "Other repos" },
+  { id: "this_repo", label: "This repo" },
+  { id: "unrelated", label: "Unrelated files" },
+  { id: "stored", label: "Stored files" },
+  { id: "unclassified", label: "Unclassified" },
+  { id: "empty", label: "Empty space" },
 ];
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PIE = { cx: 180, cy: 105, rx: 119, ry: 66, depth: 17 };
@@ -84,11 +84,9 @@ function renderStorageBreakdown(stats) {
   const normalized = values.map((value) => value * scale);
   const pieSides = document.getElementById("pie-sides");
   const pieSlices = document.getElementById("pie-slices");
-  const pieLabels = document.getElementById("pie-labels");
   const legend = document.getElementById("breakdown-legend");
   pieSides.replaceChildren();
   pieSlices.replaceChildren();
-  pieLabels.replaceChildren();
   legend.replaceChildren();
 
   let angle = -Math.PI / 2;
@@ -97,7 +95,7 @@ function renderStorageBreakdown(stats) {
     const value = normalized[index];
     if (value <= 0 || total <= 0) return;
     const nextAngle = angle + Math.PI * 2 * value / total;
-    visibleSlices.push({ ...item, value: values[index], start: angle, end: nextAngle });
+    visibleSlices.push({ ...item, start: angle, end: nextAngle });
     angle = nextAngle;
   });
 
@@ -130,26 +128,6 @@ function renderStorageBreakdown(stats) {
       }));
     });
   }
-
-  visibleSlices.forEach((item) => {
-    const percentage = total > 0 ? item.value * 100 / total : 0;
-    if (percentage < 8) return;
-    const midpoint = (item.start + item.end) / 2;
-    const point = piePoint(midpoint);
-    const x = PIE.cx + (point.x - PIE.cx) * 0.62;
-    const y = PIE.cy + (point.y - PIE.cy) * 0.62;
-    const label = makeSvgElement("text", {
-      x,
-      y,
-      class: "pie-label",
-    });
-    const category = makeSvgElement("tspan", { x, dy: "-2" });
-    category.textContent = item.short;
-    const share = makeSvgElement("tspan", { x, dy: "8" });
-    share.textContent = `${Math.round(percentage)}%`;
-    label.append(category, share);
-    pieLabels.append(label);
-  });
 
   STORAGE_LEGEND.forEach((item, index) => {
     const rawValue = Math.max(0, Number(categoryValues[item.id]) || 0);
@@ -195,7 +173,7 @@ function renderStorageBreakdown(stats) {
     note.textContent = "The first filesystem scan is running in the background. Used space remains unclassified until it finishes.";
   }
   pieTitle.textContent = `Storage makeup: ${formatBytes(disk.used)} used, ${formatBytes(disk.available)} free`;
-  pieDescription.textContent = `${visibleSlices.length} patterned categories. Slices of 8 percent or larger are labeled with a category name and percentage; the legend names every category.`;
+  pieDescription.textContent = `${visibleSlices.length} patterned categories; names, values, and percentages are shown in the adjacent legend.`;
 }
 
 async function loadStats() {

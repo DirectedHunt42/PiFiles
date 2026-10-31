@@ -76,7 +76,6 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 650; letter-spac
 .pie-base { fill: var(--text); stroke: var(--text); stroke-width: 1; }
 .pie-side { stroke: var(--text); stroke-width: .8; stroke-linejoin: round; }
 .pie-slice { stroke: var(--text); stroke-width: 1.1; stroke-linejoin: round; }
-.pie-label { fill: var(--text); stroke: var(--surface); stroke-width: 2.6; paint-order: stroke; font-size: 9px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .breakdown-note { max-width: 390px; margin: 0 auto; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .breakdown-legend { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .legend-row { display: grid; grid-template-columns: 19px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 36px; padding: 4px 0; border-bottom: 1px solid var(--border); }
