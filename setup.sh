@@ -8,7 +8,8 @@ readonly ALLOWED_SUBNET="192.168.0.0/24"
 readonly APP_DIR="/opt/pifiles"
 readonly SERVICE_NAME="pifiles-dashboard"
 readonly UPDATE_COMMAND="/usr/local/sbin/pifiles-update"
-readonly NGINX_SITE_LINK="/etc/nginx/sites-enabled/zzzzzz-pifiles"
+readonly DASHBOARD_PORT="8765"
+readonly LEGACY_NGINX_SITE_LINK="/etc/nginx/sites-enabled/zzzzzz-pifiles"
 
 if [[ "${EUID}" -ne 0 ]]; then
     printf 'Run this script with sudo, for example: sudo bash ./setup.sh\n' >&2
@@ -62,7 +63,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y avahi-daemon avahi-utils nginx python3 samba
+apt-get install -y python3 samba
 
 if [[ ! -f "$SMB_CONFIG" ]]; then
     printf 'Samba did not create its configuration file at %s.\n' "$SMB_CONFIG" >&2
@@ -179,6 +180,8 @@ Group=pifiles
 WorkingDirectory=$APP_DIR
 Environment="PIFILES_DATA_DIR=$data_dir"
 Environment=PIFILES_UPDATE_COMMAND=$UPDATE_COMMAND
+Environment=PIFILES_HOST=0.0.0.0
+Environment=PIFILES_PORT=$DASHBOARD_PORT
 ExecStart=/usr/bin/python3 $APP_DIR/app.py
 Restart=on-failure
 RestartSec=3
@@ -191,66 +194,29 @@ ReadOnlyPaths="$data_dir"
 WantedBy=multi-user.target
 EOF
 
-host_name="$(hostname -s)"
-if [[ ! "$host_name" =~ ^[A-Za-z0-9-]+$ ]]; then
-    printf 'The system hostname cannot be used to configure the files dashboard address: %s\n' "$host_name" >&2
-    exit 1
+legacy_nginx_config=0
+if [[ -e "$LEGACY_NGINX_SITE_LINK" || -L "$LEGACY_NGINX_SITE_LINK" || -e /etc/nginx/sites-enabled/pifiles || -e /etc/nginx/sites-available/pifiles ]]; then
+    rm -f -- "$LEGACY_NGINX_SITE_LINK" /etc/nginx/sites-enabled/pifiles /etc/nginx/sites-available/pifiles
+    legacy_nginx_config=1
 fi
-dashboard_host="files.${host_name,,}.local"
-cat >/etc/nginx/sites-available/pifiles <<EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $dashboard_host;
-
-    location / {
-        proxy_pass http://127.0.0.1:8765;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-}
-EOF
-rm -f /etc/nginx/sites-enabled/pifiles
-ln -sfn /etc/nginx/sites-available/pifiles "$NGINX_SITE_LINK"
-nginx -t
-
-cat >/usr/local/sbin/pifiles-publish-mdns <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-host_name="$(hostname -s | tr '[:upper:]' '[:lower:]')"
-ip_address="$(hostname -I | awk '{print $1}')"
-if [[ -z "$host_name" || -z "$ip_address" ]]; then
-    echo "Could not determine the Pi hostname or LAN address for mDNS publishing." >&2
-    exit 1
+if [[ "$legacy_nginx_config" -eq 1 ]] && systemctl is-active --quiet nginx; then
+    nginx -t
+    systemctl reload nginx
 fi
-exec /usr/bin/avahi-publish-address "files.${host_name}.local" "$ip_address"
-EOF
-chmod 0755 /usr/local/sbin/pifiles-publish-mdns
 
-cat >/etc/systemd/system/pifiles-mdns.service <<'EOF'
-[Unit]
-Description=Publish the PiFiles dashboard mDNS hostname
-After=avahi-daemon.service network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/sbin/pifiles-publish-mdns
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+systemctl disable --now pifiles-mdns.service 2>/dev/null || true
+rm -f -- /etc/systemd/system/pifiles-mdns.service /usr/local/sbin/pifiles-publish-mdns
 systemctl daemon-reload
-systemctl enable --now avahi-daemon nginx "$SERVICE_NAME" pifiles-mdns.service
+systemctl enable --now "$SERVICE_NAME"
 systemctl restart "$SERVICE_NAME"
-systemctl reload nginx
 
-printf '\nShare is ready: \\\\%s\\%s\n' "$(hostname -I | awk '{print $1}')" "$SHARE_NAME"
+ip_address="$(hostname -I | awk '{print $1}')"
+if [[ -z "$ip_address" ]]; then
+    printf 'Could not determine the Pi LAN address for the dashboard URL.\n' >&2
+    exit 1
+fi
+printf '\nShare is ready: \\\\%s\\%s\n' "$ip_address" "$SHARE_NAME"
 printf 'Shared directory: %s\n' "$data_dir"
 printf 'Allowed client subnet: %s\n' "$ALLOWED_SUBNET"
 printf 'Storage uses the free space on the filesystem containing the shared directory.\n'
-printf 'Dashboard: http://%s/\n' "$dashboard_host"
+printf 'Dashboard: http://%s:%s/\n' "$ip_address" "$DASHBOARD_PORT"

@@ -19,7 +19,7 @@ async function loadStats() {
     const stats = await response.json();
 
     document.getElementById("hostname").textContent = stats.hostname || "Pi server";
-    document.getElementById("dashboard-address").textContent = `files.${stats.hostname}.local`;
+    document.getElementById("dashboard-address").textContent = window.location.host;
     document.getElementById("sampled-at").textContent = new Date(stats.sampled_at * 1000).toLocaleTimeString();
 
     document.getElementById("disk-used").textContent = formatBytes(stats.disk.used);
