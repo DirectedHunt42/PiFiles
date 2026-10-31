@@ -13,12 +13,15 @@
   <main class="page">
     <header class="topbar">
       <a class="brand" href="/" aria-label="PiFiles home">
-        <span class="brand-mark" aria-hidden="true">P</span>
+        <svg class="brand-mark" aria-hidden="true"><use href="/icons.svg#server"></use></svg>
         <span>PiFiles<small>SERVER STATUS</small></span>
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
-        <button class="button button-muted" id="refresh-button" type="button">Refresh</button>
+        <button class="button button-muted" id="refresh-button" type="button">
+          <svg class="button-icon" aria-hidden="true"><use href="/icons.svg#refresh"></use></svg>
+          Refresh
+        </button>
       </div>
     </header>
 
@@ -33,39 +36,39 @@
 
     <section class="stats-grid" aria-label="Server statistics">
       <article class="card storage-card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">▤</span><span>Storage</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#storage"></use></svg><span>Storage</span></div>
         <div class="metric" id="disk-used">—</div>
         <p class="metric-caption">used on disk</p>
         <div class="meter"><span id="disk-meter"></span></div>
         <div class="card-foot"><span id="disk-total">— total</span><span id="disk-free">— free</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">▧</span><span>Shared files</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#folder"></use></svg><span>Shared files</span></div>
         <div class="metric" id="share-used">—</div>
         <p class="metric-caption">space used by files in the share</p>
         <div class="card-note" id="share-location">/srv/pifiles</div>
       </article>
       <article class="card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">◉</span><span>Processor</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#processor"></use></svg><span>Processor</span></div>
         <div class="metric" id="cpu-used">—</div>
         <p class="metric-caption">CPU utilization</p>
         <div class="meter"><span id="cpu-meter"></span></div>
         <div class="card-foot"><span>Load average</span><span id="load-average">—</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">▥</span><span>Memory</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#memory"></use></svg><span>Memory</span></div>
         <div class="metric" id="memory-used">—</div>
         <p class="metric-caption" id="memory-caption">RAM in use</p>
         <div class="meter"><span id="memory-meter"></span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">♨</span><span>Temperature</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#temperature"></use></svg><span>Temperature</span></div>
         <div class="metric" id="temperature">—</div>
         <p class="metric-caption">system temperature</p>
         <div class="temperature-indicator"><span class="temperature-dot"></span><span id="temperature-state">Waiting for sensor</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><span class="icon" aria-hidden="true">◷</span><span>Uptime</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#clock"></use></svg><span>Uptime</span></div>
         <div class="metric metric-uptime" id="uptime">—</div>
         <p class="metric-caption">since last restart</p>
         <div class="card-note" id="dashboard-address">—</div>
@@ -76,11 +79,9 @@
       <div class="update-copy">
         <p class="eyebrow">MAINTENANCE</p>
         <h2>Keep your server up to date</h2>
-        <p>The update resets tracked repository changes, pulls the latest version, and runs setup. Files in the shared storage are kept.</p>
+        <p>Anyone on your local network can start an update. It resets tracked repository changes, pulls the latest version, and runs setup. Files in the shared storage are kept.</p>
       </div>
       <div class="update-controls">
-        <label for="update-token">Update token</label>
-        <input id="update-token" type="password" autocomplete="off" placeholder="Enter the token shown during setup">
         <button class="button button-primary" id="update-button" type="button">Update server</button>
       </div>
       <div class="terminal" aria-live="polite">
@@ -88,7 +89,7 @@
         <pre id="update-output">Waiting for an update.</pre>
       </div>
     </section>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.2.0</span></footer>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.2.1</span></footer>
   </main>
 </body>
 </html>

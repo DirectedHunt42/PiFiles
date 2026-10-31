@@ -8,6 +8,7 @@ readonly ALLOWED_SUBNET="192.168.0.0/24"
 readonly APP_DIR="/opt/pifiles"
 readonly SERVICE_NAME="pifiles-dashboard"
 readonly UPDATE_COMMAND="/usr/local/sbin/pifiles-update"
+readonly NGINX_SITE_LINK="/etc/nginx/sites-enabled/zzzzzz-pifiles"
 
 if [[ "${EUID}" -ne 0 ]]; then
     printf 'Run this script with sudo, for example: sudo bash ./setup.sh\n' >&2
@@ -152,16 +153,11 @@ install -o root -g root -m 0644 "$repo_dir/index.html" "$APP_DIR/index.html"
 install -o root -g root -m 0644 "$repo_dir/static/app.js" "$APP_DIR/app.js"
 install -o root -g root -m 0644 "$repo_dir/static/light.css" "$APP_DIR/light.css"
 install -o root -g root -m 0644 "$repo_dir/static/dark.css" "$APP_DIR/dark.css"
+install -d -o root -g root -m 0755 "$APP_DIR/static"
+install -o root -g root -m 0644 "$repo_dir/static/icons.svg" "$APP_DIR/static/icons.svg"
 install -o root -g root -m 0755 "$repo_dir/scripts/update.sh" "$UPDATE_COMMAND"
 
-token_created=0
-if [[ ! -s /etc/pifiles-update-token ]]; then
-    umask 027
-    python3 -c 'import secrets; print(secrets.token_urlsafe(32))' >/etc/pifiles-update-token
-    token_created=1
-fi
-chown root:pifiles /etc/pifiles-update-token
-chmod 0640 /etc/pifiles-update-token
+rm -f /etc/pifiles-update-token
 printf '%s\n' "$repo_dir" >/etc/pifiles-update-repo
 chmod 0644 /etc/pifiles-update-repo
 
@@ -182,7 +178,6 @@ User=pifiles
 Group=pifiles
 WorkingDirectory=$APP_DIR
 Environment="PIFILES_DATA_DIR=$data_dir"
-Environment=PIFILES_UPDATE_TOKEN_FILE=/etc/pifiles-update-token
 Environment=PIFILES_UPDATE_COMMAND=$UPDATE_COMMAND
 ExecStart=/usr/bin/python3 $APP_DIR/app.py
 Restart=on-failure
@@ -216,7 +211,8 @@ server {
     }
 }
 EOF
-ln -sfn /etc/nginx/sites-available/pifiles /etc/nginx/sites-enabled/pifiles
+rm -f /etc/nginx/sites-enabled/pifiles
+ln -sfn /etc/nginx/sites-available/pifiles "$NGINX_SITE_LINK"
 nginx -t
 
 cat >/usr/local/sbin/pifiles-publish-mdns <<'EOF'
@@ -258,6 +254,3 @@ printf 'Shared directory: %s\n' "$data_dir"
 printf 'Allowed client subnet: %s\n' "$ALLOWED_SUBNET"
 printf 'Storage uses the free space on the filesystem containing the shared directory.\n'
 printf 'Dashboard: http://%s/\n' "$dashboard_host"
-if [[ "$token_created" -eq 1 ]]; then
-    printf 'Dashboard update token: %s\n' "$(cat /etc/pifiles-update-token)"
-fi

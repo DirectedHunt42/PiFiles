@@ -60,17 +60,8 @@ async function loadStats() {
 }
 
 async function loadUpdateStatus() {
-  const token = document.getElementById("update-token").value.trim();
-  if (!token) {
-    document.getElementById("update-status").textContent = "Locked";
-    document.getElementById("update-output").textContent = "Enter the update token printed by setup to view update output.";
-    return;
-  }
   try {
-    const response = await fetch("/api/update", {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch("/api/update", { cache: "no-store" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `Status request failed (${response.status})`);
     document.getElementById("update-status").textContent = result.status;
@@ -83,19 +74,10 @@ async function loadUpdateStatus() {
 
 async function startUpdate() {
   const button = document.getElementById("update-button");
-  const token = document.getElementById("update-token").value.trim();
-  if (!token) {
-    document.getElementById("update-output").textContent = "Enter the update token printed by setup on the Pi.";
-    return;
-  }
-
   button.disabled = true;
   document.getElementById("update-status").textContent = "Starting…";
   try {
-    const response = await fetch("/api/update", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch("/api/update", { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `Update request failed (${response.status})`);
     document.getElementById("update-output").textContent = "Update started. Output will appear below.";
@@ -110,7 +92,6 @@ async function startUpdate() {
 
 document.getElementById("refresh-button").addEventListener("click", loadStats);
 document.getElementById("update-button").addEventListener("click", startUpdate);
-document.getElementById("update-token").addEventListener("input", loadUpdateStatus);
 loadStats();
 loadUpdateStatus();
 window.setInterval(loadStats, 5000);

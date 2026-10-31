@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import hmac
 import json
 import logging
 import os
@@ -17,7 +16,6 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("PIFILES_DATA_DIR", "/srv/pifiles")).resolve()
-TOKEN_FILE = Path(os.environ.get("PIFILES_UPDATE_TOKEN_FILE", "/etc/pifiles-update-token"))
 UPDATE_COMMAND = os.environ.get("PIFILES_UPDATE_COMMAND", "/usr/local/sbin/pifiles-update")
 UPDATE_STATUS = Path("/var/lib/pifiles/update-status")
 UPDATE_LOG = Path("/var/log/pifiles-update.log")
@@ -176,20 +174,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format_string, *args):
         logging.info("%s - %s", self.client_address[0], format_string % args)
 
-    def has_valid_update_token(self):
-        try:
-            expected_token = TOKEN_FILE.read_text(encoding="utf-8").strip()
-        except OSError:
-            logging.exception("Could not read updater token")
-            return None
-        supplied_token = self.headers.get("Authorization", "")
-        if supplied_token.startswith("Bearer "):
-            supplied_token = supplied_token[7:]
-        supplied_token = supplied_token.strip()
-        return bool(expected_token) and hmac.compare_digest(
-            supplied_token.encode("utf-8"), expected_token.encode("utf-8")
-        )
-
     def send_bytes(self, status, content_type, body):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -219,13 +203,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_json(503, {"error": "System statistics are temporarily unavailable."})
             return
         if path == "/api/update":
-            token_valid = self.has_valid_update_token()
-            if token_valid is None:
-                self.send_json(503, {"error": "Updates are not configured on this server."})
-                return
-            if not token_valid:
-                self.send_json(401, {"error": "A valid update token is required."})
-                return
             try:
                 status = UPDATE_STATUS.read_text(encoding="utf-8").strip()
             except FileNotFoundError:
@@ -242,6 +219,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/app.js": ("app.js", "text/javascript; charset=utf-8"),
             "/light.css": ("light.css", "text/css; charset=utf-8"),
             "/dark.css": ("dark.css", "text/css; charset=utf-8"),
+            "/icons.svg": ("static/icons.svg", "image/svg+xml"),
         }
         asset = static_files.get(path)
         if asset is None:
@@ -259,14 +237,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if urlparse(self.path).path != "/api/update":
             self.send_json(404, {"error": "Not found."})
-            return
-
-        token_valid = self.has_valid_update_token()
-        if token_valid is None:
-            self.send_json(503, {"error": "Updates are not configured on this server."})
-            return
-        if not token_valid:
-            self.send_json(401, {"error": "A valid update token is required."})
             return
 
         try:
