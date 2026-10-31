@@ -9,12 +9,5 @@
     --soft: rgb(255 255 255 / 8%);
     --meter: rgb(255 255 255 / 22%);
     --meter-fill: #fff;
-    --terminal: #fff;
-    --terminal-text: #000;
-    --terminal-muted: rgb(0 0 0 / 62%);
   }
-
-  .button-primary { background: var(--text); color: var(--surface); }
-  .button-primary:hover { background: var(--muted); }
-  .terminal-heading { border-bottom-color: rgb(0 0 0 / 20%); }
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>PiFiles · Server status</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any">
   <link rel="stylesheet" href="/light.css">
   <link rel="stylesheet" href="/dark.css">
   <script src="/app.js" defer></script>
@@ -19,6 +19,9 @@
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
+        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.0">
+          <span>GitHub</span><span class="github-version">v0.4.0</span>
+        </a>
         <button class="button button-muted" id="refresh-button" type="button">
           <svg class="button-icon" aria-hidden="true"><use href="/icons/refresh.svg#icon"></use></svg>
           Refresh
@@ -76,6 +79,61 @@
       </article>
     </section>
 
+    <section class="breakdown-card" aria-labelledby="breakdown-title">
+      <div class="breakdown-header">
+        <div>
+          <p class="eyebrow">FILESYSTEM OVERVIEW</p>
+          <h2 id="breakdown-title"><svg class="icon" aria-hidden="true"><use href="/icons/storage.svg#icon"></use></svg><span>Storage makeup</span></h2>
+          <p class="breakdown-summary">An estimated view of files and free space on this disk.</p>
+        </div>
+        <span class="scan-status" id="scan-status" aria-live="polite">Mapping files…</span>
+      </div>
+      <div class="breakdown-content">
+        <div class="pie-column">
+          <svg class="pie-chart" id="storage-pie" viewBox="0 0 360 220" role="img" aria-labelledby="pie-title pie-description">
+            <title id="pie-title">Storage usage by category</title>
+            <desc id="pie-description">A patterned three-dimensional pie chart of used and free disk space.</desc>
+            <defs>
+              <pattern id="pattern-system" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <path d="M0 2h8M0 6h8" fill="none" stroke="var(--text)" stroke-width="1.1"/>
+              </pattern>
+              <pattern id="pattern-other-repos" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <path d="M-2 2 2-2M0 8 8 0M6 10l4-4" fill="none" stroke="var(--text)" stroke-width="1.2"/>
+              </pattern>
+              <pattern id="pattern-this-repo" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <path d="M-2 2 2-2M0 8 8 0M6 10l4-4M-2 6l4 4M0 0l8 8M6-2l4 4" fill="none" stroke="var(--text)" stroke-width="1"/>
+              </pattern>
+              <pattern id="pattern-unrelated" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <circle cx="2" cy="2" r="1.2" fill="var(--text)"/>
+                <circle cx="6" cy="6" r="1.2" fill="var(--text)"/>
+              </pattern>
+              <pattern id="pattern-stored" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <path d="M2 0v8M6 0v8" fill="none" stroke="var(--text)" stroke-width="1.2"/>
+              </pattern>
+              <pattern id="pattern-unclassified" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <path d="M0 0h4v4H0zM4 4h4v4H4z" fill="none" stroke="var(--text)" stroke-width="1"/>
+              </pattern>
+              <pattern id="pattern-empty" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="var(--surface)"/>
+                <circle cx="4" cy="4" r="1" fill="none" stroke="var(--text)" stroke-width="1"/>
+              </pattern>
+            </defs>
+            <ellipse class="pie-base" cx="180" cy="122" rx="119" ry="66"/>
+            <g id="pie-sides" aria-hidden="true"></g>
+            <g id="pie-slices" aria-hidden="true"></g>
+          </svg>
+          <p class="breakdown-note" id="breakdown-note">The first filesystem scan is running in the background.</p>
+        </div>
+        <ul class="breakdown-legend" id="breakdown-legend" aria-label="Storage categories"></ul>
+      </div>
+    </section>
+
     <section class="update-card">
       <div class="update-copy">
         <p class="eyebrow">MAINTENANCE</p>
@@ -90,7 +148,14 @@
         <pre id="update-output">Waiting for an update.</pre>
       </div>
     </section>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.3.1</span></footer>
+    <dialog class="license-dialog" id="license-dialog" aria-labelledby="license-title">
+      <div class="license-dialog-heading">
+        <h2 id="license-title">PiFiles license</h2>
+        <button class="button button-muted" id="license-close" type="button">Close</button>
+      </div>
+      <pre id="license-content" aria-live="polite">Loading license…</pre>
+    </dialog>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.0</span></footer>
   </main>
 </body>
 </html>

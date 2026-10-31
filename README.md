@@ -1,6 +1,6 @@
 <p align="center"><img src="static/favicon.svg" alt="PiFiles favicon" width="64"></p>
 
-# PiFiles 0.3.1
+# PiFiles 0.4.0
 
 PiFiles turns a Raspberry Pi or Debian server into a local file share with a browser dashboard for storage and system health. Shared files are kept in their own directory, separate from the application repository.
 
@@ -8,6 +8,7 @@ PiFiles turns a Raspberry Pi or Debian server into a local file share with a bro
 
 - A Windows-compatible SMB share named `PiFiles` for storing and accessing files on the server.
 - A live dashboard showing disk and share usage, CPU, memory, temperature, load average, and uptime.
+- A monochrome, patterned storage chart that estimates file categories and shows free space.
 - A dashboard action to pull the latest repository version and rerun setup.
 - A configurable shared directory, independent from the repository so application updates leave shared files in place.
 
@@ -24,8 +25,8 @@ The SMB share allows guest access from `192.168.0.0/24` by default. If your LAN 
 Clone the repository on the server and run setup:
 
 ```sh
-git clone https://github.com/DirectedHunt42/File-server.git
-cd File-server
+git clone https://github.com/DirectedHunt42/PiFiles.git
+cd PiFiles
 sudo bash ./setup.sh
 ```
 
@@ -51,6 +52,6 @@ The share has no password and allows clients on its configured subnet to read an
 
 ## Dashboard and updates
 
-The dashboard refreshes system status automatically. Disk usage reports the filesystem containing the shared directory; share usage reports the size of files stored inside the share. Temperature may show as unavailable if the system does not expose a supported sensor.
+The dashboard refreshes system status automatically. Disk usage reports the filesystem containing the shared directory; share usage reports the size of files stored inside the share. The storage makeup chart estimates allocated file blocks on that filesystem, scanning in the background and refreshing every five minutes. Reserved blocks, filesystem metadata, and paths the dashboard cannot read appear as unclassified space. Temperature may show as unavailable if the system does not expose a supported sensor.
 
 The **Update server** button pulls the latest repository revision and reruns setup while keeping the configured shared directory. It resets tracked repository changes before updating, so commit or back up any local edits to application files first. The shared files directory is separate and is not reset by this operation.

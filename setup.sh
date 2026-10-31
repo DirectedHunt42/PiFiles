@@ -56,8 +56,8 @@ if [[ "$data_dir" == "$repo_dir" || "$data_dir" == "$repo_dir/"* || "$repo_dir" 
     printf 'Keep the shared directory separate from the repository so updates cannot affect stored files.\n' >&2
     exit 2
 fi
-if [[ ! -f "$repo_dir/app.py" || ! -f "$repo_dir/scripts/update.sh" || ! -d "$repo_dir/static" ]]; then
-    printf 'Run setup from the complete File-server repository checkout.\n' >&2
+if [[ ! -f "$repo_dir/app.py" || ! -f "$repo_dir/LICENSE.txt" || ! -f "$repo_dir/scripts/update.sh" || ! -d "$repo_dir/static" ]]; then
+    printf 'Run setup from the complete PiFiles repository checkout.\n' >&2
     exit 1
 fi
 
@@ -151,6 +151,7 @@ fi
 install -d -o root -g root -m 0755 "$APP_DIR"
 install -o root -g root -m 0644 "$repo_dir/app.py" "$APP_DIR/app.py"
 install -o root -g root -m 0644 "$repo_dir/index.html" "$APP_DIR/index.html"
+install -o root -g root -m 0644 "$repo_dir/LICENSE.txt" "$APP_DIR/LICENSE.txt"
 install -o root -g root -m 0644 "$repo_dir/static/app.js" "$APP_DIR/app.js"
 install -o root -g root -m 0644 "$repo_dir/static/light.css" "$APP_DIR/light.css"
 install -o root -g root -m 0644 "$repo_dir/static/dark.css" "$APP_DIR/dark.css"

@@ -4,6 +4,7 @@ import logging
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import threading
 import time
@@ -29,6 +30,32 @@ _snapshot_lock = threading.Lock()
 _share_snapshot = None
 _share_snapshot_at = 0.0
 _share_snapshot_lock = threading.Lock()
+_storage_snapshot = None
+_storage_snapshot_at = 0.0
+_storage_scan_in_progress = False
+_storage_snapshot_lock = threading.Lock()
+
+STORAGE_SCAN_INTERVAL = 300
+STORAGE_CATEGORIES = (
+    ("system", "System files"),
+    ("other_repos", "Other repos"),
+    ("this_repo", "This repo"),
+    ("unrelated", "Unrelated files"),
+    ("stored", "Stored files"),
+    ("unclassified", "Unclassified"),
+    ("empty", "Empty space"),
+)
+SYSTEM_DIRECTORIES = {"bin", "boot", "etc", "lib", "lib32", "lib64", "opt", "sbin", "usr", "var"}
+CATEGORY_PRIORITY = {"unrelated": 0, "system": 1, "other_repos": 2, "this_repo": 3, "stored": 4}
+CURRENT_REPO_ROOTS = {ROOT}
+try:
+    configured_repo = Path("/etc/pifiles-update-repo").read_text(encoding="utf-8").strip()
+    if configured_repo:
+        configured_repo = Path(configured_repo).resolve()
+        if configured_repo.is_dir():
+            CURRENT_REPO_ROOTS.add(configured_repo)
+except OSError:
+    pass
 
 
 def read_cpu_percent():
@@ -116,6 +143,176 @@ def get_share_size():
         return _share_snapshot
 
 
+def path_is_within(path, directory):
+    try:
+        path.relative_to(directory)
+        return True
+    except ValueError:
+        return False
+
+
+def mount_path_from_mountinfo(data_device):
+    """Find the mounted filesystem root containing DATA_DIR and nested mounts to skip."""
+    mount_entries = []
+    nested_mounts = set()
+    try:
+        mountinfo = Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError:
+        mountinfo = ""
+
+    for line in mountinfo.splitlines():
+        fields = line.split(" - ", 1)[0].split()
+        if len(fields) < 5 or fields[2] != f"{os.major(data_device)}:{os.minor(data_device)}":
+            continue
+        mount_text = fields[4]
+        for escaped, character in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
+            mount_text = mount_text.replace(escaped, character)
+        mount_path = Path(mount_text)
+        mount_entries.append(mount_path)
+
+    containing_mounts = [path for path in mount_entries if path_is_within(DATA_DIR, path)]
+    if containing_mounts:
+        filesystem_root = max(containing_mounts, key=lambda path: len(path.parts))
+        nested_mounts = {
+            path for path in mount_entries
+            if path != filesystem_root and path_is_within(path, filesystem_root)
+        }
+        return filesystem_root, nested_mounts
+
+    # Fallback for systems without mountinfo: find the first ancestor on another device.
+    filesystem_root = DATA_DIR
+    while filesystem_root.parent != filesystem_root:
+        try:
+            if filesystem_root.parent.stat().st_dev != data_device:
+                break
+        except OSError:
+            break
+        filesystem_root = filesystem_root.parent
+    return filesystem_root, nested_mounts
+
+
+def storage_category(path, in_repository):
+    if path_is_within(path, DATA_DIR):
+        return "stored"
+    if any(path_is_within(path, repository) for repository in CURRENT_REPO_ROOTS):
+        return "this_repo"
+    if in_repository:
+        return "other_repos"
+    parts = path.parts
+    if len(parts) > 1 and parts[0] == "/" and parts[1] in SYSTEM_DIRECTORIES:
+        return "system"
+    return "unrelated"
+
+
+def scan_storage_usage():
+    """Estimate allocated bytes per category without following symlinks or crossing mounts."""
+    data_device = DATA_DIR.stat().st_dev
+    filesystem_root, nested_mounts = mount_path_from_mountinfo(data_device)
+    category_bytes = {category: 0 for category, _ in STORAGE_CATEGORIES if category != "empty"}
+    seen_inodes = {}
+    skipped_entries = 0
+    pending = [(filesystem_root, False, filesystem_root.stat())]
+
+    def record_usage(file_stat, category):
+        allocated = file_stat.st_blocks * 512 if hasattr(file_stat, "st_blocks") else file_stat.st_size
+        if stat.S_ISDIR(file_stat.st_mode) or file_stat.st_nlink <= 1:
+            category_bytes[category] += allocated
+            return
+        inode = (file_stat.st_dev, file_stat.st_ino)
+        previous = seen_inodes.get(inode)
+        if previous is None:
+            seen_inodes[inode] = (category, allocated)
+            category_bytes[category] += allocated
+        elif CATEGORY_PRIORITY[category] > CATEGORY_PRIORITY[previous[0]]:
+            old_category, old_allocated = previous
+            category_bytes[old_category] -= old_allocated
+            category_bytes[category] += old_allocated
+            seen_inodes[inode] = (category, old_allocated)
+
+    while pending:
+        directory, parent_is_repository, directory_stat = pending.pop()
+        if directory_stat.st_dev != data_device or directory in nested_mounts:
+            continue
+        try:
+            with os.scandir(directory) as iterator:
+                entries = list(iterator)
+        except OSError:
+            skipped_entries += 1
+            continue
+
+        is_repository = parent_is_repository
+        for entry in entries:
+            if entry.name != ".git":
+                continue
+            try:
+                is_repository = is_repository or entry.is_dir(follow_symlinks=False) or entry.is_file(follow_symlinks=False)
+            except OSError:
+                skipped_entries += 1
+            break
+        record_usage(directory_stat, storage_category(directory, is_repository))
+
+        for entry in entries:
+            entry_path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError:
+                skipped_entries += 1
+                continue
+            if stat.S_ISDIR(entry_stat.st_mode):
+                if entry_stat.st_dev == data_device and entry_path not in nested_mounts:
+                    pending.append((entry_path, is_repository, entry_stat))
+                continue
+            record_usage(entry_stat, storage_category(entry_path, is_repository))
+
+    return category_bytes, skipped_entries
+
+
+def run_storage_scan():
+    global _storage_snapshot, _storage_snapshot_at, _storage_scan_in_progress
+    try:
+        category_bytes, skipped_entries = scan_storage_usage()
+        disk = shutil.disk_usage(DATA_DIR)
+        measured = sum(category_bytes.values())
+        if measured > disk.used and measured:
+            scale = disk.used / measured
+            category_bytes = {key: int(value * scale) for key, value in category_bytes.items()}
+        accounted = sum(category_bytes.values())
+        category_bytes["unclassified"] += max(0, disk.used - accounted)
+        snapshot = {
+            "status": "ready",
+            "partial": skipped_entries > 0,
+            "categories": category_bytes,
+            "disk": {"used": disk.used, "total": disk.total, "available": disk.free},
+            "scanned_at": int(time.time()),
+        }
+    except Exception:
+        logging.exception("Could not scan filesystem storage usage")
+        snapshot = {"status": "error", "partial": True, "categories": None, "disk": None}
+
+    with _storage_snapshot_lock:
+        _storage_snapshot = snapshot
+        _storage_snapshot_at = time.monotonic()
+        _storage_scan_in_progress = False
+
+
+def get_storage_breakdown():
+    global _storage_snapshot, _storage_snapshot_at, _storage_scan_in_progress
+    start_scan = False
+    with _storage_snapshot_lock:
+        if not _storage_scan_in_progress and (
+            _storage_snapshot is None or time.monotonic() - _storage_snapshot_at >= STORAGE_SCAN_INTERVAL
+        ):
+            _storage_scan_in_progress = True
+            if _storage_snapshot is None:
+                _storage_snapshot = {"status": "scanning", "partial": False, "categories": None, "disk": None}
+            start_scan = True
+        snapshot = dict(_storage_snapshot)
+
+    if start_scan:
+        threading.Thread(target=run_storage_scan, daemon=True, name="storage-breakdown-scan").start()
+    return snapshot
+
+
 def build_stats():
     disk = shutil.disk_usage(DATA_DIR)
     try:
@@ -141,6 +338,7 @@ def build_stats():
             "available": disk.free,
             "percent": round(disk.used * 100 / disk.total) if disk.total else 0,
         },
+        "storage_breakdown": get_storage_breakdown(),
         "share": {"path": str(DATA_DIR), "used": share_used, "error": share_error},
         "sampled_at": int(time.time()),
     }
@@ -219,6 +417,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/app.js": ("app.js", "text/javascript; charset=utf-8"),
             "/light.css": ("light.css", "text/css; charset=utf-8"),
             "/dark.css": ("dark.css", "text/css; charset=utf-8"),
+            "/license.txt": ("LICENSE.txt", "text/plain; charset=utf-8"),
             "/favicon.svg": ("static/favicon.svg", "image/svg+xml"),
             "/icons/server.svg": ("static/icons/server.svg", "image/svg+xml"),
             "/icons/storage.svg": ("static/icons/storage.svg", "image/svg+xml"),
