@@ -12,17 +12,17 @@ const setMeter = (id, value) => {
   meter.style.width = `${clamped}%`;
 };
 
-const STORAGE_LEGEND = [
-  { id: "system", label: "System files", callout: "System files" },
-  { id: "other_repos", label: "Other repos", callout: "Other repos" },
-  { id: "this_repo", label: "This repo", callout: "This repo" },
-  { id: "unrelated", label: "Unrelated files", callout: "Unrelated" },
-  { id: "stored", label: "Stored files", callout: "Stored files" },
-  { id: "unclassified", label: "Unclassified", callout: "Unclassified" },
-  { id: "empty", label: "Empty space", callout: "Empty space" },
+const STORAGE_CATEGORIES = [
+  { id: "system", label: "System files" },
+  { id: "other_repos", label: "Other repos" },
+  { id: "this_repo", label: "This repo" },
+  { id: "unrelated", label: "Unrelated files" },
+  { id: "stored", label: "Stored files" },
+  { id: "unclassified", label: "Unclassified" },
+  { id: "empty", label: "Empty space" },
 ];
 const SVG_NS = "http://www.w3.org/2000/svg";
-const PIE = { cx: 250, cy: 105, rx: 119, ry: 66, depth: 17 };
+const PIE = { cx: 300, cy: 130, rx: 145, ry: 82, depth: 20 };
 const patternId = (id) => id.replace(/_/g, "-");
 
 function makeSvgElement(name, attributes) {
@@ -72,9 +72,9 @@ function pieSidePaths(start, end) {
 
 function distributeCallouts(items) {
   items.sort((left, right) => left.anchor.y - right.anchor.y);
-  const minY = 12;
-  const maxY = 208;
-  const gap = items.length > 1 ? Math.min(18, (maxY - minY) / (items.length - 1)) : 0;
+  const minY = 17;
+  const maxY = 248;
+  const gap = items.length > 1 ? Math.min(34, (maxY - minY) / (items.length - 1)) : 0;
   const positions = items.map((item) => Math.max(minY, Math.min(maxY, item.anchor.y)));
   for (let index = 1; index < positions.length; index += 1) {
     positions[index] = Math.max(positions[index], positions[index - 1] + gap);
@@ -92,6 +92,7 @@ function renderPieCallouts(slices, total) {
   const layer = document.getElementById("pie-callouts");
   layer.replaceChildren();
   const sides = { left: [], right: [] };
+  const callouts = [];
   slices.forEach((item) => {
     const midpoint = (item.start + item.end) / 2;
     const side = Math.cos(midpoint) >= 0 ? "right" : "left";
@@ -100,26 +101,14 @@ function renderPieCallouts(slices, total) {
 
   Object.entries(sides).forEach(([side, sideItems]) => {
     const isRight = side === "right";
-    const baseRailX = isRight ? PIE.cx + PIE.rx * 1.3 + 8 : PIE.cx - PIE.rx * 1.3 - 8;
-    const lineEndX = isRight ? 413 : 87;
-    const labelX = isRight ? 416 : 84;
+    const baseRailX = isRight ? PIE.cx + PIE.rx * 1.3 + 10 : PIE.cx - PIE.rx * 1.3 - 10;
+    const labelX = isRight ? 507 : 93;
     distributeCallouts(sideItems).forEach(({ item, anchor, labelY }, index) => {
       const railX = baseRailX + (isRight ? 1 : -1) * index * 3;
       const outer = {
         x: PIE.cx + (anchor.x - PIE.cx) * 1.3,
         y: PIE.cy + (anchor.y - PIE.cy) * 1.3,
       };
-      const line = makeSvgElement("path", {
-        d: `M ${anchor.x} ${anchor.y} L ${outer.x} ${outer.y} L ${railX} ${outer.y} L ${railX} ${labelY} L ${lineEndX} ${labelY}`,
-        class: "pie-callout-line",
-      });
-      layer.append(line);
-      layer.append(makeSvgElement("circle", {
-        cx: anchor.x,
-        cy: anchor.y,
-        r: 2,
-        class: "pie-callout-dot",
-      }));
       const percentage = total > 0 ? item.value * 100 / total : 0;
       const label = makeSvgElement("text", {
         x: labelX,
@@ -127,31 +116,38 @@ function renderPieCallouts(slices, total) {
         class: "pie-callout-label",
         "text-anchor": isRight ? "start" : "end",
       });
-      label.textContent = `${item.callout} ${Math.round(percentage)}%`;
+      label.textContent = item.label;
       layer.append(label);
+      const labelWidth = label.getComputedTextLength();
+      layer.removeChild(label);
+      const lineEndX = isRight ? labelX + labelWidth + 4 : labelX - labelWidth - 4;
+      const lineY = labelY + 7;
+      const detail = makeSvgElement("text", {
+        x: labelX,
+        y: labelY + 20,
+        class: "pie-callout-detail",
+        "text-anchor": isRight ? "start" : "end",
+      });
+      detail.textContent = `${percentage.toFixed(1)}% · ${((item.value || 0) / (1024 ** 3)).toFixed(1)} GB`;
+      callouts.push({ anchor, outer, railX, lineEndX, lineY, label, detail });
     });
   });
-}
 
-function makeLegendSwatch(item) {
-  const sourcePattern = document.getElementById(`pattern-${patternId(item.id)}`);
-  const localPatternId = `legend-pattern-${patternId(item.id)}`;
-  const swatch = makeSvgElement("svg", {
-    class: "legend-swatch",
-    viewBox: "0 0 16 16",
-    "aria-hidden": "true",
-    focusable: "false",
+  callouts.forEach(({ anchor, outer, railX, lineEndX, lineY }) => {
+    layer.append(makeSvgElement("path", {
+      d: `M ${anchor.x} ${anchor.y} L ${outer.x} ${outer.y} L ${railX} ${outer.y} L ${railX} ${lineY} L ${lineEndX} ${lineY}`,
+      class: "pie-callout-line",
+    }));
   });
-  const definitions = makeSvgElement("defs", {});
-  const pattern = sourcePattern.cloneNode(true);
-  pattern.id = localPatternId;
-  definitions.append(pattern);
-  swatch.append(definitions, makeSvgElement("rect", {
-    width: 16,
-    height: 16,
-    fill: `url(#${localPatternId})`,
-  }));
-  return swatch;
+  callouts.forEach(({ anchor }) => {
+    layer.append(makeSvgElement("circle", {
+      cx: anchor.x,
+      cy: anchor.y,
+      r: 2.4,
+      class: "pie-callout-dot",
+    }));
+  });
+  callouts.forEach(({ label, detail }) => layer.append(label, detail));
 }
 
 function renderStorageBreakdown(stats) {
@@ -162,20 +158,18 @@ function renderStorageBreakdown(stats) {
     ? { ...breakdown.categories, empty: disk.available }
     : { unclassified: disk.used, empty: disk.available };
   const total = Math.max(0, Number(disk.total) || 0);
-  const values = STORAGE_LEGEND.map((item) => Math.max(0, Number(categoryValues[item.id]) || 0));
+  const values = STORAGE_CATEGORIES.map((item) => Math.max(0, Number(categoryValues[item.id]) || 0));
   const sum = values.reduce((result, value) => result + value, 0);
   const scale = sum > 0 ? total / sum : 0;
   const normalized = values.map((value) => value * scale);
   const pieSides = document.getElementById("pie-sides");
   const pieSlices = document.getElementById("pie-slices");
-  const legend = document.getElementById("breakdown-legend");
   pieSides.replaceChildren();
   pieSlices.replaceChildren();
-  legend.replaceChildren();
 
   let angle = -Math.PI / 2;
   const visibleSlices = [];
-  STORAGE_LEGEND.forEach((item, index) => {
+  STORAGE_CATEGORIES.forEach((item, index) => {
     const value = normalized[index];
     if (value <= 0 || total <= 0) return;
     const nextAngle = angle + Math.PI * 2 * value / total;
@@ -214,28 +208,6 @@ function renderStorageBreakdown(stats) {
   }
   renderPieCallouts(visibleSlices, total);
 
-  STORAGE_LEGEND.forEach((item, index) => {
-    const rawValue = Math.max(0, Number(categoryValues[item.id]) || 0);
-    const percentage = total > 0 ? rawValue * 100 / total : 0;
-    const row = document.createElement("li");
-    row.className = "legend-row";
-    const swatch = makeLegendSwatch(item);
-    const copy = document.createElement("span");
-    copy.className = "legend-copy";
-    const name = document.createElement("span");
-    name.className = "legend-name";
-    name.textContent = item.label;
-    const value = document.createElement("span");
-    value.className = "legend-value";
-    value.textContent = formatBytes(rawValue);
-    const percent = document.createElement("span");
-    percent.className = "legend-percent";
-    percent.textContent = `${percentage.toFixed(1)}%`;
-    copy.append(name, value);
-    row.append(swatch, copy, percent);
-    legend.append(row);
-  });
-
   const status = document.getElementById("scan-status");
   const note = document.getElementById("breakdown-note");
   const pieTitle = document.getElementById("pie-title");
@@ -256,7 +228,7 @@ function renderStorageBreakdown(stats) {
     note.textContent = "The first filesystem scan is running in the background. Used space remains unclassified until it finishes.";
   }
   pieTitle.textContent = `Storage makeup: ${formatBytes(disk.used)} used, ${formatBytes(disk.available)} free`;
-  pieDescription.textContent = `${visibleSlices.length} patterned categories. Leader labels connect category names and percentages to their slices; the adjacent pattern key gives allocated sizes.`;
+  pieDescription.textContent = `${visibleSlices.length} patterned categories. Leader labels identify each slice, with percentage and size in gigabytes beneath each name.`;
 }
 
 async function loadStats() {
