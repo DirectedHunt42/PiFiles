@@ -13,12 +13,21 @@
 
 * { box-sizing: border-box; }
 
+html { scrollbar-color: var(--muted) var(--page); scrollbar-width: thin; scrollbar-gutter: stable; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: var(--page); }
+*::-webkit-scrollbar-thumb { border: 2px solid var(--page); border-radius: 9px; background: var(--border); }
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+*::-webkit-scrollbar-corner { background: var(--page); }
+
 body {
   margin: 0;
   min-width: 320px;
   background: var(--page);
   color: var(--text);
 }
+
+body.license-open { overflow: hidden; }
 
 button { font: inherit; }
 .page { width: min(100% - 48px, 1040px); margin: 0 auto; }
@@ -67,6 +76,7 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 650; letter-spac
 .pie-base { fill: var(--text); stroke: var(--text); stroke-width: 1; }
 .pie-side { stroke: var(--text); stroke-width: .8; stroke-linejoin: round; }
 .pie-slice { stroke: var(--text); stroke-width: 1.1; stroke-linejoin: round; }
+.pie-label { fill: var(--text); stroke: var(--surface); stroke-width: 2.6; paint-order: stroke; font-size: 9px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .breakdown-note { max-width: 390px; margin: 0 auto; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .breakdown-legend { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .legend-row { display: grid; grid-template-columns: 19px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 36px; padding: 4px 0; border-bottom: 1px solid var(--border); }
@@ -89,7 +99,9 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 650; letter-spac
 .terminal { grid-column: 1 / -1; overflow: hidden; border: 1px solid var(--border); background: #000; color: #fff; }
 .terminal-heading { display: flex; justify-content: space-between; padding: 9px 11px; border-bottom: 1px solid rgb(255 255 255 / 27%); color: rgb(255 255 255 / 68%); font-size: 9px; font-weight: 600; letter-spacing: .8px; }
 .terminal-state { color: #fff; letter-spacing: 0; }
-.terminal pre { min-height: 58px; max-height: 170px; overflow: auto; margin: 0; padding: 11px; color: #fff; font: 10px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.terminal pre { min-height: 58px; max-height: 170px; overflow: auto; margin: 0; padding: 11px; color: #fff; font: 10px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-color: rgb(255 255 255 / 58%) #000; overscroll-behavior: contain; }
+.terminal pre::-webkit-scrollbar-track, .terminal pre::-webkit-scrollbar-corner { background: #000; }
+.terminal pre::-webkit-scrollbar-thumb { border-color: #000; background: rgb(255 255 255 / 58%); }
 footer { padding: 18px 0 25px; color: var(--muted); text-align: center; font-size: 10px; }
 .version { margin-left: 5px; }
 .license-trigger { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
@@ -98,7 +110,8 @@ footer { padding: 18px 0 25px; color: var(--muted); text-align: center; font-siz
 .license-dialog::backdrop { background: rgb(0 0 0 / 58%); }
 .license-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
 .license-dialog-heading h2 { margin: 0; font-size: 16px; font-weight: 650; }
-.license-dialog pre { max-height: calc(100vh - 112px); max-height: calc(100dvh - 112px); overflow: auto; margin: 0; padding: 14px; border: 1px solid var(--border); background: var(--soft); color: var(--text); font: 11px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.license-dialog { overscroll-behavior: contain; }
+.license-dialog pre { max-height: calc(100vh - 112px); max-height: calc(100dvh - 112px); overflow: auto; margin: 0; padding: 14px; border: 1px solid var(--border); background: var(--soft); color: var(--text); font: 11px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; overscroll-behavior: contain; }
 
 @media (max-width: 700px) {
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
