@@ -192,7 +192,7 @@ Restart=on-failure
 RestartSec=3
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=true
+ProtectHome=read-only
 ReadOnlyPaths="$data_dir"
 
 [Install]

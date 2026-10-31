@@ -152,7 +152,7 @@ def path_is_within(path, directory):
 
 
 def mount_path_from_mountinfo(data_device):
-    """Find the mounted filesystem root containing DATA_DIR and nested mounts to skip."""
+    """Find the mounted filesystem root and skip nested bind mounts of other paths."""
     mount_entries = []
     nested_mounts = set()
     try:
@@ -160,23 +160,33 @@ def mount_path_from_mountinfo(data_device):
     except OSError:
         mountinfo = ""
 
+    def unescape_mount_field(value):
+        for escaped, character in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
+            value = value.replace(escaped, character)
+        return value
+
     for line in mountinfo.splitlines():
         fields = line.split(" - ", 1)[0].split()
         if len(fields) < 5 or fields[2] != f"{os.major(data_device)}:{os.minor(data_device)}":
             continue
-        mount_text = fields[4]
-        for escaped, character in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
-            mount_text = mount_text.replace(escaped, character)
-        mount_path = Path(mount_text)
-        mount_entries.append(mount_path)
+        root_path = Path(unescape_mount_field(fields[3]))
+        mount_path = Path(unescape_mount_field(fields[4]))
+        mount_entries.append((mount_path, root_path))
 
-    containing_mounts = [path for path in mount_entries if path_is_within(DATA_DIR, path)]
+    containing_mounts = [path for path, _ in mount_entries if path_is_within(DATA_DIR, path)]
     if containing_mounts:
         filesystem_root = max(containing_mounts, key=lambda path: len(path.parts))
-        nested_mounts = {
-            path for path in mount_entries
-            if path != filesystem_root and path_is_within(path, filesystem_root)
-        }
+        for mount_path, root_path in mount_entries:
+            if mount_path == filesystem_root or not path_is_within(mount_path, filesystem_root):
+                continue
+            source_path = filesystem_root.joinpath(*root_path.parts[1:])
+            if source_path != mount_path:
+                try:
+                    source_is_visible = source_path.stat().st_dev == data_device
+                except OSError:
+                    source_is_visible = False
+                if source_is_visible:
+                    nested_mounts.add(mount_path)
         return filesystem_root, nested_mounts
 
     # Fallback for systems without mountinfo: find the first ancestor on another device.
@@ -238,6 +248,7 @@ def scan_storage_usage():
                 entries = list(iterator)
         except OSError:
             skipped_entries += 1
+            record_usage(directory_stat, storage_category(directory, parent_is_repository))
             continue
 
         is_repository = parent_is_repository
