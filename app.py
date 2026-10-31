@@ -219,7 +219,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/app.js": ("app.js", "text/javascript; charset=utf-8"),
             "/light.css": ("light.css", "text/css; charset=utf-8"),
             "/dark.css": ("dark.css", "text/css; charset=utf-8"),
-            "/icons.svg": ("static/icons.svg", "image/svg+xml"),
+            "/favicon.svg": ("static/favicon.svg", "image/svg+xml"),
+            "/icons/server.svg": ("static/icons/server.svg", "image/svg+xml"),
+            "/icons/storage.svg": ("static/icons/storage.svg", "image/svg+xml"),
+            "/icons/folder.svg": ("static/icons/folder.svg", "image/svg+xml"),
+            "/icons/processor.svg": ("static/icons/processor.svg", "image/svg+xml"),
+            "/icons/memory.svg": ("static/icons/memory.svg", "image/svg+xml"),
+            "/icons/temperature.svg": ("static/icons/temperature.svg", "image/svg+xml"),
+            "/icons/clock.svg": ("static/icons/clock.svg", "image/svg+xml"),
+            "/icons/refresh.svg": ("static/icons/refresh.svg", "image/svg+xml"),
         }
         asset = static_files.get(path)
         if asset is None:

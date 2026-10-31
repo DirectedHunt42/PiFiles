@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon" viewBox="0 0 24 24">
+  <path d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/>
+  <path d="M11 8v9"/>
+  <circle cx="11" cy="19" r="1.5" fill="currentColor" stroke="none"/>
+  </symbol>
+</svg>

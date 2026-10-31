@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>PiFiles · Server status</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/light.css">
   <link rel="stylesheet" href="/dark.css">
   <script src="/app.js" defer></script>
@@ -13,13 +14,13 @@
   <main class="page">
     <header class="topbar">
       <a class="brand" href="/" aria-label="PiFiles home">
-        <svg class="brand-mark" aria-hidden="true"><use href="/icons.svg#server"></use></svg>
+        <svg class="brand-mark" aria-hidden="true"><use href="/icons/server.svg#icon"></use></svg>
         <span>PiFiles<small>SERVER STATUS</small></span>
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
         <button class="button button-muted" id="refresh-button" type="button">
-          <svg class="button-icon" aria-hidden="true"><use href="/icons.svg#refresh"></use></svg>
+          <svg class="button-icon" aria-hidden="true"><use href="/icons/refresh.svg#icon"></use></svg>
           Refresh
         </button>
       </div>
@@ -36,39 +37,39 @@
 
     <section class="stats-grid" aria-label="Server statistics">
       <article class="card storage-card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#storage"></use></svg><span>Storage</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/storage.svg#icon"></use></svg><span>Storage</span></div>
         <div class="metric" id="disk-used">—</div>
         <p class="metric-caption">used on disk</p>
         <div class="meter"><span id="disk-meter"></span></div>
         <div class="card-foot"><span id="disk-total">— total</span><span id="disk-free">— free</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#folder"></use></svg><span>Shared files</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/folder.svg#icon"></use></svg><span>Shared files</span></div>
         <div class="metric" id="share-used">—</div>
         <p class="metric-caption">space used by files in the share</p>
         <div class="card-note" id="share-location">/srv/pifiles</div>
       </article>
       <article class="card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#processor"></use></svg><span>Processor</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/processor.svg#icon"></use></svg><span>Processor</span></div>
         <div class="metric" id="cpu-used">—</div>
         <p class="metric-caption">CPU utilization</p>
         <div class="meter"><span id="cpu-meter"></span></div>
         <div class="card-foot"><span>Load average</span><span id="load-average">—</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#memory"></use></svg><span>Memory</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/memory.svg#icon"></use></svg><span>Memory</span></div>
         <div class="metric" id="memory-used">—</div>
         <p class="metric-caption" id="memory-caption">RAM in use</p>
         <div class="meter"><span id="memory-meter"></span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#temperature"></use></svg><span>Temperature</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/temperature.svg#icon"></use></svg><span>Temperature</span></div>
         <div class="metric" id="temperature">—</div>
         <p class="metric-caption">system temperature</p>
         <div class="temperature-indicator"><span class="temperature-dot"></span><span id="temperature-state">Waiting for sensor</span></div>
       </article>
       <article class="card">
-        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons.svg#clock"></use></svg><span>Uptime</span></div>
+        <div class="card-heading"><svg class="icon" aria-hidden="true"><use href="/icons/clock.svg#icon"></use></svg><span>Uptime</span></div>
         <div class="metric metric-uptime" id="uptime">—</div>
         <p class="metric-caption">since last restart</p>
         <div class="card-note" id="dashboard-address">—</div>
@@ -89,7 +90,7 @@
         <pre id="update-output">Waiting for an update.</pre>
       </div>
     </section>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.3.0</span></footer>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.3.1</span></footer>
   </main>
 </body>
 </html>

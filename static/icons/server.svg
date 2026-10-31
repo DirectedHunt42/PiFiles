@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon" viewBox="0 0 24 24">
+  <rect x="4" y="3" width="16" height="18" rx="2"/>
+  <path d="M4 9h16M4 15h16"/>
+  <circle cx="8" cy="6" r=".7" fill="currentColor" stroke="none"/>
+  <circle cx="8" cy="12" r=".7" fill="currentColor" stroke="none"/>
+  <circle cx="8" cy="18" r=".7" fill="currentColor" stroke="none"/>
+  <path d="M12 6h4m-4 6h4m-4 6h4"/>
+  </symbol>
+</svg>

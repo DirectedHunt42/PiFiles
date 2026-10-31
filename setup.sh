@@ -155,7 +155,11 @@ install -o root -g root -m 0644 "$repo_dir/static/app.js" "$APP_DIR/app.js"
 install -o root -g root -m 0644 "$repo_dir/static/light.css" "$APP_DIR/light.css"
 install -o root -g root -m 0644 "$repo_dir/static/dark.css" "$APP_DIR/dark.css"
 install -d -o root -g root -m 0755 "$APP_DIR/static"
-install -o root -g root -m 0644 "$repo_dir/static/icons.svg" "$APP_DIR/static/icons.svg"
+install -o root -g root -m 0644 "$repo_dir/static/favicon.svg" "$APP_DIR/static/favicon.svg"
+install -d -o root -g root -m 0755 "$APP_DIR/static/icons"
+for icon in server storage folder processor memory temperature clock refresh; do
+    install -o root -g root -m 0644 "$repo_dir/static/icons/$icon.svg" "$APP_DIR/static/icons/$icon.svg"
+done
 install -o root -g root -m 0755 "$repo_dir/scripts/update.sh" "$UPDATE_COMMAND"
 
 rm -f /etc/pifiles-update-token
