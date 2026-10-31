@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>PiFiles · Server status</title>
+  <link rel="stylesheet" href="/light.css">
+  <link rel="stylesheet" href="/dark.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="PiFiles home">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span>PiFiles<small>SERVER STATUS</small></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="live"><span class="live-dot"></span>Live</span>
+        <button class="button button-muted" id="refresh-button" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <section class="intro">
+      <div>
+        <p class="eyebrow">YOUR FILE SERVER</p>
+        <h1 id="hostname">Connecting…</h1>
+        <p class="subheading">A quick look at storage and system health.</p>
+      </div>
+      <div class="last-updated">Updated <span id="sampled-at">—</span></div>
+    </section>
+
+    <section class="stats-grid" aria-label="Server statistics">
+      <article class="card storage-card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">▤</span><span>Storage</span></div>
+        <div class="metric" id="disk-used">—</div>
+        <p class="metric-caption">used on disk</p>
+        <div class="meter"><span id="disk-meter"></span></div>
+        <div class="card-foot"><span id="disk-total">— total</span><span id="disk-free">— free</span></div>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">▧</span><span>Shared files</span></div>
+        <div class="metric" id="share-used">—</div>
+        <p class="metric-caption">space used by files in the share</p>
+        <div class="card-note" id="share-location">/srv/pifiles</div>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">◉</span><span>Processor</span></div>
+        <div class="metric" id="cpu-used">—</div>
+        <p class="metric-caption">CPU utilization</p>
+        <div class="meter"><span id="cpu-meter"></span></div>
+        <div class="card-foot"><span>Load average</span><span id="load-average">—</span></div>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">▥</span><span>Memory</span></div>
+        <div class="metric" id="memory-used">—</div>
+        <p class="metric-caption" id="memory-caption">RAM in use</p>
+        <div class="meter"><span id="memory-meter"></span></div>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">♨</span><span>Temperature</span></div>
+        <div class="metric" id="temperature">—</div>
+        <p class="metric-caption">system temperature</p>
+        <div class="temperature-indicator"><span class="temperature-dot"></span><span id="temperature-state">Waiting for sensor</span></div>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span class="icon" aria-hidden="true">◷</span><span>Uptime</span></div>
+        <div class="metric metric-uptime" id="uptime">—</div>
+        <p class="metric-caption">since last restart</p>
+        <div class="card-note" id="dashboard-address">—</div>
+      </article>
+    </section>
+
+    <section class="update-card">
+      <div class="update-copy">
+        <p class="eyebrow">MAINTENANCE</p>
+        <h2>Keep your server up to date</h2>
+        <p>The update resets tracked repository changes, pulls the latest version, and runs setup. Files in the shared storage are kept.</p>
+      </div>
+      <div class="update-controls">
+        <label for="update-token">Update token</label>
+        <input id="update-token" type="password" autocomplete="off" placeholder="Enter the token shown during setup">
+        <button class="button button-primary" id="update-button" type="button">Update server</button>
+      </div>
+      <div class="terminal" aria-live="polite">
+        <div class="terminal-heading"><span>UPDATE OUTPUT</span><span class="terminal-state" id="update-status">Ready</span></div>
+        <pre id="update-output">Waiting for an update.</pre>
+      </div>
+    </section>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <span class="version">v0.2.0</span></footer>
+  </main>
+</body>
+</html>

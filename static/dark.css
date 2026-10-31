@@ -1,0 +1,22 @@
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #111722;
+    --surface: #192231;
+    --surface-muted: #202b3c;
+    --text: #e6ecf5;
+    --muted: #9aa8bd;
+    --border: #2a3749;
+    --accent: #91a5ff;
+    --accent-strong: #a7b6ff;
+    --accent-soft: #293453;
+    --green: #45d6a2;
+    --meter: #303c4e;
+    --terminal: #0c111a;
+    --terminal-text: #d3def2;
+  }
+
+  .card { box-shadow: 0 3px 12px rgb(0 0 0 / 10%); }
+  .button-primary { color: #11172a; }
+  .button-primary:hover { color: #11172a; }
+}
