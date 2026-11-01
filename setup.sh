@@ -4,6 +4,10 @@ set -Eeuo pipefail
 readonly SHARE_NAME="PiFiles"
 readonly SMB_CONFIG="/etc/samba/smb.conf"
 readonly SHARE_CONFIG="/etc/samba/pifiles-share.conf"
+readonly SMB_USER_FILE="/etc/pifiles-smb-user"
+readonly SMB_PASSWORD_FILE="/etc/pifiles-smb-password"
+readonly DEFAULT_SMB_USER="pifiles"
+readonly DEFAULT_SMB_PASSWORD="PiFiles123"
 readonly ALLOWED_SUBNET="192.168.0.0/24"
 readonly APP_DIR="/opt/pifiles"
 readonly SERVICE_NAME="pifiles-dashboard"
@@ -65,6 +69,25 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y python3 samba
 
+smb_user="${PIFILES_SMB_USER:-}"
+smb_password="${PIFILES_SMB_PASSWORD:-}"
+if [[ -z "$smb_user" && -r "$SMB_USER_FILE" ]]; then
+    smb_user="$(cat "$SMB_USER_FILE")"
+fi
+if [[ -z "$smb_password" && -r "$SMB_PASSWORD_FILE" ]]; then
+    smb_password="$(cat "$SMB_PASSWORD_FILE")"
+fi
+smb_user="${smb_user:-$DEFAULT_SMB_USER}"
+smb_password="${smb_password:-$DEFAULT_SMB_PASSWORD}"
+if [[ ! "$smb_user" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$ ]]; then
+    printf 'The SMB username must be 1-32 letters, digits, underscores, dots, or hyphens, and start with a letter or underscore.\n' >&2
+    exit 2
+fi
+if [[ "$smb_password" == *$'\n'* || "$smb_password" == *$'\r'* ]]; then
+    printf 'The SMB password cannot contain a newline.\n' >&2
+    exit 2
+fi
+
 if [[ ! -f "$SMB_CONFIG" ]]; then
     printf 'Samba did not create its configuration file at %s.\n' "$SMB_CONFIG" >&2
     exit 1
@@ -84,6 +107,17 @@ chown nobody:nogroup "$data_dir"
 chmod 2775 "$data_dir"
 printf '%s\n' "$data_dir" >/etc/pifiles-data-dir
 chmod 0644 /etc/pifiles-data-dir
+
+if ! id pifiles >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin pifiles
+fi
+if ! id "$smb_user" >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin "$smb_user"
+fi
+install -o root -g pifiles -m 0640 /dev/null "$SMB_USER_FILE"
+printf '%s\n' "$smb_user" >"$SMB_USER_FILE"
+install -o root -g pifiles -m 0640 /dev/null "$SMB_PASSWORD_FILE"
+printf '%s\n' "$smb_password" >"$SMB_PASSWORD_FILE"
 
 config_tmp="$(mktemp "${SHARE_CONFIG}.XXXXXX")"
 main_tmp=""
@@ -111,8 +145,8 @@ cat >"$config_tmp" <<EOF
    path = "$data_dir"
    browseable = yes
    read only = no
-   guest ok = yes
-   guest only = yes
+   guest ok = no
+   valid users = $smb_user
    force user = nobody
    force group = nogroup
    create mask = 0664
@@ -142,6 +176,12 @@ if ! testparm -s "$SMB_CONFIG" >/dev/null; then
     exit 1
 fi
 
+if pdbedit -L | cut -d: -f1 | grep -Fx -- "$smb_user" >/dev/null; then
+    printf '%s\n%s\n' "$smb_password" "$smb_password" | smbpasswd -s "$smb_user"
+else
+    printf '%s\n%s\n' "$smb_password" "$smb_password" | smbpasswd -s -a "$smb_user"
+fi
+smbpasswd -e "$smb_user"
 systemctl enable --now smbd
 systemctl reload smbd
 
@@ -221,6 +261,8 @@ if [[ -z "$ip_address" ]]; then
     exit 1
 fi
 printf '\nShare is ready: \\\\%s\\%s\n' "$ip_address" "$SHARE_NAME"
+printf 'SMB username: %s\n' "$smb_user"
+printf 'SMB password is saved in %s (read it with sudo).\n' "$SMB_PASSWORD_FILE"
 printf 'Shared directory: %s\n' "$data_dir"
 printf 'Allowed client subnet: %s\n' "$ALLOWED_SUBNET"
 printf 'Storage uses the free space on the filesystem containing the shared directory.\n'

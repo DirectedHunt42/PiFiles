@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("PIFILES_DATA_DIR", "/srv/pifiles")).resolve()
 UPDATE_COMMAND = os.environ.get("PIFILES_UPDATE_COMMAND", "/usr/local/sbin/pifiles-update")
+SMB_USER_FILE = Path("/etc/pifiles-smb-user")
+SMB_PASSWORD_FILE = Path("/etc/pifiles-smb-password")
 UPDATE_STATUS = Path("/var/lib/pifiles/update-status")
 UPDATE_LOG = Path("/var/log/pifiles-update.log")
 HOST = os.environ.get("PIFILES_HOST", "127.0.0.1")
@@ -404,6 +406,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/share-credentials":
+            try:
+                credentials = {
+                    "username": SMB_USER_FILE.read_text(encoding="utf-8").strip(),
+                    "password": SMB_PASSWORD_FILE.read_text(encoding="utf-8").rstrip("\r\n"),
+                }
+            except OSError:
+                logging.exception("Could not read SMB share credentials")
+                self.send_json(503, {"error": "Share credentials are temporarily unavailable."})
+                return
+            self.send_json(200, credentials)
+            return
         if path == "/api/stats":
             try:
                 self.send_json(200, get_stats())

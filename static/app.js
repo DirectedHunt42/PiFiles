@@ -228,7 +228,9 @@ async function loadStats() {
     if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
     const stats = await response.json();
 
-    document.getElementById("hostname").textContent = stats.hostname || "Pi server";
+    const hostname = stats.hostname || "Pi server";
+    document.getElementById("hostname").textContent = hostname;
+    document.title = `${hostname} · PiFiles`;
     document.getElementById("dashboard-address").textContent = window.location.host;
     document.getElementById("sampled-at").textContent = new Date(stats.sampled_at * 1000).toLocaleTimeString();
 
@@ -267,6 +269,23 @@ async function loadStats() {
   } catch (error) {
     document.getElementById("hostname").textContent = "Server unavailable";
     document.getElementById("sampled-at").textContent = error.message;
+  }
+}
+
+async function loadShareCredentials() {
+  const username = document.getElementById("smb-username");
+  const password = document.getElementById("smb-password");
+  const networkPath = document.getElementById("share-network-path");
+  networkPath.textContent = `\\\\${window.location.hostname}\\PiFiles`;
+  try {
+    const response = await fetch("/api/share-credentials", { cache: "no-store" });
+    const credentials = await response.json();
+    if (!response.ok) throw new Error(credentials.error || `Credentials request failed (${response.status})`);
+    username.textContent = credentials.username;
+    password.textContent = credentials.password;
+  } catch {
+    username.textContent = "Unavailable";
+    password.textContent = "Unavailable";
   }
 }
 
@@ -339,6 +358,7 @@ licenseDialog.addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
 loadStats();
+loadShareCredentials();
 loadUpdateStatus();
 window.setInterval(loadStats, 5000);
 window.setInterval(loadUpdateStatus, 2000);

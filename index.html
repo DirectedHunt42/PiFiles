@@ -19,8 +19,8 @@
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
-        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.5">
-          <span>GitHub repo</span><span class="github-version">v0.4.5</span>
+        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.7">
+          <span>GitHub repo</span><span class="github-version">v0.4.7</span>
         </a>
         <button class="button button-muted" id="refresh-button" type="button">
           <svg class="button-icon" aria-hidden="true"><use href="/icons/refresh.svg#icon"></use></svg>
@@ -77,6 +77,29 @@
         <p class="metric-caption">since last restart</p>
         <div class="card-note" id="dashboard-address">—</div>
       </article>
+    </section>
+
+    <section class="credentials-card" aria-labelledby="credentials-title">
+      <div class="credentials-copy">
+        <p class="eyebrow">NETWORK DRIVE</p>
+        <h2 id="credentials-title">Connect to the PiFiles share</h2>
+        <p>Use this path and account when mapping the share in Windows or connecting from another device.</p>
+      </div>
+      <dl class="credentials-values">
+        <div class="credential-item credential-path">
+          <dt>Network path</dt>
+          <dd id="share-network-path">Loadingâ€¦</dd>
+        </div>
+        <div class="credential-item">
+          <dt>Username</dt>
+          <dd id="smb-username">Loadingâ€¦</dd>
+        </div>
+        <div class="credential-item">
+          <dt>Password</dt>
+          <dd id="smb-password">Loadingâ€¦</dd>
+        </div>
+      </dl>
+      <p class="credentials-note">Anyone who can access this dashboard can view these credentials. Keep it on a trusted network.</p>
     </section>
 
     <section class="breakdown-card" aria-labelledby="breakdown-title">
@@ -155,7 +178,7 @@
       </div>
       <pre id="license-content" aria-live="polite">Loading license…</pre>
     </dialog>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.5</span></footer>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.7</span></footer>
   </main>
 </body>
 </html>
