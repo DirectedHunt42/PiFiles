@@ -19,8 +19,8 @@
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
-        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.7">
-          <span>GitHub repo</span><span class="github-version">v0.4.7</span>
+        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.8">
+          <span>GitHub repo</span><span class="github-version">v0.4.8</span>
         </a>
         <button class="button button-muted" id="refresh-button" type="button">
           <svg class="button-icon" aria-hidden="true"><use href="/icons/refresh.svg#icon"></use></svg>
@@ -157,6 +157,56 @@
       </div>
     </section>
 
+    <section class="cleanup-card" aria-labelledby="cleanup-title">
+      <div class="cleanup-header">
+        <div>
+          <p class="eyebrow">SHARED FILES</p>
+          <h2 id="cleanup-title"><svg class="icon" aria-hidden="true"><use href="/icons/auto-clean.svg#icon"></use></svg><span>Automatic folder cleanup</span></h2>
+          <p class="cleanup-summary">Set a maximum size for a folder. When it is exceeded, files are removed by your chosen rule until the folder is under its limit.</p>
+        </div>
+      </div>
+      <div class="cleanup-content">
+        <div class="cleanup-tree-panel">
+          <h3>Shared folder tree</h3>
+          <p class="cleanup-hint">Select a folder to configure it. The cleanup icon marks enabled folders.</p>
+          <div class="cleanup-tree" id="cleanup-tree" aria-live="polite">Loading folders…</div>
+        </div>
+        <form class="cleanup-form" id="cleanup-form">
+          <h3 id="cleanup-folder-name">Choose a folder</h3>
+          <p class="cleanup-folder-size" id="cleanup-folder-size">—</p>
+          <label class="cleanup-enabled">
+            <input id="cleanup-enabled" type="checkbox" disabled>
+            <span>Enable automatic cleanup for this folder</span>
+          </label>
+          <label class="cleanup-field">
+            <span>Maximum folder size</span>
+            <span class="cleanup-size-input">
+              <input id="cleanup-threshold" type="number" min="0.001" step="any" value="1" required disabled>
+              <select id="cleanup-unit" aria-label="Size unit" disabled>
+                <option value="1">B</option>
+                <option value="1024">KB</option>
+                <option value="1048576">MB</option>
+                <option value="1073741824">GB</option>
+                <option value="1099511627776">TB</option>
+              </select>
+            </span>
+          </label>
+          <label class="cleanup-field" for="cleanup-strategy">
+            <span>Remove files in this order</span>
+            <select id="cleanup-strategy" disabled>
+              <option value="oldest">Oldest first (last modified)</option>
+              <option value="newest">Newest first (last modified)</option>
+              <option value="largest">Largest first</option>
+              <option value="smallest">Smallest first</option>
+            </select>
+          </label>
+          <p class="cleanup-warning">Cleanup runs about once a minute. It permanently deletes files, not folders. Keep backups of important data.</p>
+          <button class="button button-primary" id="cleanup-save" type="submit" disabled>Save folder settings</button>
+          <p class="cleanup-message" id="cleanup-message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <section class="update-card">
       <div class="update-copy">
         <p class="eyebrow">MAINTENANCE</p>
@@ -178,7 +228,7 @@
       </div>
       <pre id="license-content" aria-live="polite">Loading license…</pre>
     </dialog>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.7</span></footer>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.8</span></footer>
   </main>
 </body>
 </html>

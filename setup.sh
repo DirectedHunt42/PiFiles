@@ -198,10 +198,11 @@ install -o root -g root -m 0644 "$repo_dir/static/dark.css" "$APP_DIR/dark.css"
 install -d -o root -g root -m 0755 "$APP_DIR/static"
 install -o root -g root -m 0644 "$repo_dir/static/favicon.svg" "$APP_DIR/static/favicon.svg"
 install -d -o root -g root -m 0755 "$APP_DIR/static/icons"
-for icon in server storage folder processor memory temperature clock refresh; do
+for icon in server storage folder processor memory temperature clock refresh auto-clean; do
     install -o root -g root -m 0644 "$repo_dir/static/icons/$icon.svg" "$APP_DIR/static/icons/$icon.svg"
 done
 install -o root -g root -m 0755 "$repo_dir/scripts/update.sh" "$UPDATE_COMMAND"
+install -d -o pifiles -g pifiles -m 0750 /var/lib/pifiles
 
 rm -f /etc/pifiles-update-token
 printf '%s\n' "$repo_dir" >/etc/pifiles-update-repo
@@ -222,6 +223,7 @@ After=network.target
 Type=simple
 User=pifiles
 Group=pifiles
+SupplementaryGroups=nogroup
 WorkingDirectory=$APP_DIR
 Environment="PIFILES_DATA_DIR=$data_dir"
 Environment=PIFILES_UPDATE_COMMAND=$UPDATE_COMMAND
@@ -233,7 +235,7 @@ RestartSec=3
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadOnlyPaths="$data_dir"
+ReadWritePaths="$data_dir"
 
 [Install]
 WantedBy=multi-user.target

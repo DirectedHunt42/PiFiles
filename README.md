@@ -1,6 +1,6 @@
 <p align="center"><img src="static/favicon.svg" alt="PiFiles favicon" width="64"></p>
 
-# PiFiles 0.4.7
+# PiFiles 0.4.8
 
 PiFiles adds a network file share and a small server status dashboard to a Raspberry Pi or Debian machine. It is intended to sit alongside services you already run, including an existing website. It does not replace your web server or serve your website's content.
 
@@ -9,6 +9,7 @@ PiFiles adds a network file share and a small server status dashboard to a Raspb
 - An authenticated SMB share named `PiFiles`, which you can open or map as a network drive from Windows, macOS, or Linux.
 - A browser dashboard for share and disk usage, CPU, memory, temperature, load, and uptime.
 - A storage chart that estimates how disk space is being used.
+- Optional automatic cleanup policies for individual shared folders, based on a size limit and file age or size ordering.
 - A dashboard button for updating PiFiles from its Git repository.
 - A separate data directory for shared files, so application updates do not overwrite them.
 
@@ -85,6 +86,10 @@ The configured credentials are kept for later setup runs. If you change them, ru
 Shared files are kept in their own directory, separate from the application files installed under `/opt/pifiles`. Samba writes files in the share as the `nobody` system account. Keep a separate backup of important files.
 
 The dashboard refreshes system status automatically. Disk usage describes the filesystem containing the shared directory; share usage measures files stored inside the share. The storage makeup chart estimates allocated file blocks on that filesystem, scans in the background, and refreshes every five minutes. Reserved blocks, filesystem metadata, and paths the dashboard cannot read appear as unclassified space. Temperature may be unavailable if the system does not expose a supported sensor.
+
+### Automatic folder cleanup
+
+Select a folder in the dashboard's **Automatic folder cleanup** tree, enable its policy, choose a maximum folder size, and select which files to remove first: oldest or newest by modification time, or largest or smallest by file size. Once a folder exceeds its limit, PiFiles checks it about once a minute and deletes regular files until the folder is back under the limit. Directories are never deleted; symbolic links are neither followed nor deleted. Cleanup is permanent; keep backups of important files. The dashboard can delete share files, so only expose it to trusted users and networks.
 
 ## Updates
 

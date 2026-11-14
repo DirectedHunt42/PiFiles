@@ -320,6 +320,163 @@ async function startUpdate() {
   }
 }
 
+const cleanupTreeCache = new Map();
+let selectedCleanupPath = null;
+const cleanupUnits = [
+  { value: 1099511627776, label: "TB" },
+  { value: 1073741824, label: "GB" },
+  { value: 1048576, label: "MB" },
+  { value: 1024, label: "KB" },
+  { value: 1, label: "B" },
+];
+
+function cleanupUnitFor(bytes) {
+  return cleanupUnits.find((unit) => bytes >= unit.value) || cleanupUnits[cleanupUnits.length - 1];
+}
+
+function setCleanupFormDisabled(disabled) {
+  ["cleanup-enabled", "cleanup-threshold", "cleanup-unit", "cleanup-strategy", "cleanup-save"]
+    .forEach((id) => { document.getElementById(id).disabled = disabled; });
+}
+
+async function loadCleanupFolder(path) {
+  const tree = document.getElementById("cleanup-tree");
+  const message = document.getElementById("cleanup-message");
+  try {
+    const response = await fetch(`/api/cleanup?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Folder request failed (${response.status})`);
+    cleanupTreeCache.set(path, result);
+    if (path === "") renderCleanupTree();
+    selectedCleanupPath = path;
+    document.getElementById("cleanup-folder-name").textContent = path ? result.name : `${result.name} (share root)`;
+    document.getElementById("cleanup-folder-size").textContent = `${formatBytes(result.size_bytes)} currently used`;
+    const policy = result.policy;
+    const threshold = policy?.threshold_bytes || 1073741824;
+    const unit = cleanupUnitFor(threshold);
+    document.getElementById("cleanup-enabled").checked = Boolean(policy?.enabled);
+    document.getElementById("cleanup-threshold").value = (threshold / unit.value).toPrecision(6).replace(/\.?0+$/, "");
+    document.getElementById("cleanup-unit").value = String(unit.value);
+    document.getElementById("cleanup-strategy").value = policy?.strategy || "oldest";
+    message.textContent = "";
+    setCleanupFormDisabled(false);
+    renderCleanupTree();
+  } catch (error) {
+    if (path === "") tree.textContent = `Folder list unavailable. ${error.message}`;
+    else message.textContent = error.message;
+    if (path === selectedCleanupPath) setCleanupFormDisabled(true);
+  }
+}
+
+function renderCleanupTree() {
+  const container = document.getElementById("cleanup-tree");
+  const root = cleanupTreeCache.get("");
+  if (!root) return;
+  const list = document.createElement("ul");
+  list.className = "folder-tree-list";
+  appendCleanupTreeItem(list, root, true);
+  container.replaceChildren(list);
+}
+
+function appendCleanupTreeItem(list, folder, isRoot = false) {
+  const item = document.createElement("li");
+  item.className = "folder-tree-item";
+  const row = document.createElement("div");
+  row.className = "folder-tree-row";
+  const children = cleanupTreeCache.get(folder.path);
+  const toggle = document.createElement("button");
+  toggle.className = "folder-tree-toggle";
+  toggle.type = "button";
+  toggle.textContent = folder.has_children ? (children ? "−" : "+") : "·";
+  toggle.setAttribute("aria-label", isRoot ? "Shared folder root" : children ? "Collapse folder" : "Expand folder");
+  toggle.disabled = !folder.has_children || isRoot;
+  toggle.addEventListener("click", async () => {
+    if (cleanupTreeCache.has(folder.path)) {
+      cleanupTreeCache.delete(folder.path);
+      renderCleanupTree();
+    } else {
+      try {
+        const response = await fetch(`/api/cleanup?path=${encodeURIComponent(folder.path)}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Folder request failed (${response.status})`);
+        cleanupTreeCache.set(folder.path, result);
+        renderCleanupTree();
+      } catch (error) {
+        document.getElementById("cleanup-message").textContent = error.message;
+      }
+    }
+  });
+  row.append(toggle);
+
+  const select = document.createElement("button");
+  select.className = "folder-tree-name";
+  select.type = "button";
+  select.textContent = isRoot ? `${folder.name} (share root)` : folder.name;
+  select.setAttribute("aria-pressed", String(selectedCleanupPath === folder.path));
+  select.addEventListener("click", () => loadCleanupFolder(folder.path));
+  row.append(select);
+  if (folder.enabled) {
+    const icon = makeSvgElement("svg", {
+      class: "icon folder-clean-icon",
+    });
+    const use = makeSvgElement("use", { href: "/icons/auto-clean.svg#icon" });
+    icon.append(use);
+    icon.removeAttribute("aria-hidden");
+    icon.setAttribute("role", "img");
+    icon.setAttribute("aria-label", "Automatic cleanup enabled");
+    icon.setAttribute("title", "Automatic cleanup enabled");
+    row.append(icon);
+  }
+  item.append(row);
+
+  if (children) {
+    const childList = document.createElement("ul");
+    childList.className = "folder-tree-list";
+    children.folders.forEach((child) => appendCleanupTreeItem(childList, child));
+    item.append(childList);
+  }
+  list.append(item);
+}
+
+async function saveCleanupSettings(event) {
+  event.preventDefault();
+  if (selectedCleanupPath === null) return;
+  const threshold = Number(document.getElementById("cleanup-threshold").value);
+  const unit = Number(document.getElementById("cleanup-unit").value);
+  const thresholdBytes = Math.round(threshold * unit);
+  const message = document.getElementById("cleanup-message");
+  const button = document.getElementById("cleanup-save");
+  const savedPath = selectedCleanupPath;
+  if (!Number.isSafeInteger(thresholdBytes) || thresholdBytes < 1) {
+    message.textContent = "Enter a valid folder size.";
+    return;
+  }
+  button.disabled = true;
+  message.textContent = "Saving…";
+  try {
+    const response = await fetch("/api/cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: savedPath,
+        enabled: document.getElementById("cleanup-enabled").checked,
+        threshold_bytes: thresholdBytes,
+        strategy: document.getElementById("cleanup-strategy").value,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Save failed (${response.status})`);
+    cleanupTreeCache.clear();
+    await loadCleanupFolder("");
+    if (savedPath) await loadCleanupFolder(savedPath);
+    message.textContent = result.status;
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 let licenseLoaded = false;
 let licenseLoading = false;
 
@@ -348,6 +505,7 @@ async function showLicense() {
 
 document.getElementById("refresh-button").addEventListener("click", loadStats);
 document.getElementById("update-button").addEventListener("click", startUpdate);
+document.getElementById("cleanup-form").addEventListener("submit", saveCleanupSettings);
 document.getElementById("license-open").addEventListener("click", showLicense);
 document.getElementById("license-close").addEventListener("click", () => {
   document.getElementById("license-dialog").close();
@@ -358,6 +516,7 @@ licenseDialog.addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
 loadStats();
+loadCleanupFolder("");
 loadShareCredentials();
 loadUpdateStatus();
 window.setInterval(loadStats, 5000);

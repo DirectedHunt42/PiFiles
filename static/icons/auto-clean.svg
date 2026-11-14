@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 3v2M20.5 12h-2M12 21v-2M3.5 12h2M12 5v2l2-1"/>
+    <path d="M8 9h8l-.7 10H8.7zM7 8h10M10 8V6.5h4V8M10.5 11v5M13.5 11v5"/>
+  </symbol>
+</svg>

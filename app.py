@@ -6,13 +6,14 @@ import platform
 import shutil
 import stat
 import subprocess
+import tempfile
 import threading
 import time
 from collections import deque
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -22,8 +23,12 @@ SMB_USER_FILE = Path("/etc/pifiles-smb-user")
 SMB_PASSWORD_FILE = Path("/etc/pifiles-smb-password")
 UPDATE_STATUS = Path("/var/lib/pifiles/update-status")
 UPDATE_LOG = Path("/var/log/pifiles-update.log")
+CLEANUP_POLICIES_FILE = Path(os.environ.get("PIFILES_CLEANUP_CONFIG", "/var/lib/pifiles/cleanup-policies.json"))
 HOST = os.environ.get("PIFILES_HOST", "127.0.0.1")
 PORT = int(os.environ.get("PIFILES_PORT", "8765"))
+CLEANUP_INTERVAL = 60
+MAX_CLEANUP_THRESHOLD = 2**53 - 1
+CLEANUP_STRATEGIES = {"oldest", "newest", "largest", "smallest"}
 
 _previous_cpu = None
 _snapshot = None
@@ -36,6 +41,7 @@ _storage_snapshot = None
 _storage_snapshot_at = 0.0
 _storage_scan_in_progress = False
 _storage_snapshot_lock = threading.Lock()
+_cleanup_policies_lock = threading.Lock()
 
 STORAGE_SCAN_INTERVAL = 300
 STORAGE_CATEGORIES = (
@@ -379,6 +385,203 @@ def tail_update_log(limit=100):
         return "Update output is temporarily unavailable."
 
 
+def resolve_share_directory(relative_path):
+    if not isinstance(relative_path, str) or "\\" in relative_path or "\0" in relative_path:
+        raise ValueError("Invalid folder path.")
+    parts = [] if relative_path == "" else relative_path.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("Invalid folder path.")
+
+    directory = DATA_DIR
+    root_device = DATA_DIR.stat().st_dev
+    for part in parts:
+        directory = directory / part
+        directory_stat = directory.lstat()
+        if not stat.S_ISDIR(directory_stat.st_mode) or directory_stat.st_dev != root_device:
+            raise ValueError("Folder is not a regular directory in the shared storage.")
+    return directory
+
+
+def is_same_filesystem(file_stat, device):
+    return os.name == "nt" or file_stat.st_dev == device
+
+
+def scan_cleanup_files(directory, include_files=True):
+    device = directory.stat().st_dev
+    pending = [directory]
+    files = []
+    total_bytes = 0
+    while pending:
+        current = pending.pop()
+        with os.scandir(current) as entries:
+            for entry in entries:
+                entry_stat = os.lstat(entry.path)
+                if not is_same_filesystem(entry_stat, device):
+                    continue
+                if stat.S_ISDIR(entry_stat.st_mode):
+                    pending.append(Path(entry.path))
+                elif stat.S_ISREG(entry_stat.st_mode):
+                    if include_files:
+                        files.append((Path(entry.path), entry_stat))
+                    total_bytes += entry_stat.st_size
+    return files, total_bytes
+
+
+def cleanup_folder(relative_path, policy):
+    directory = resolve_share_directory(relative_path)
+    files, total_bytes = scan_cleanup_files(directory)
+    threshold = policy["threshold_bytes"]
+    if total_bytes <= threshold:
+        return 0
+
+    strategy = policy["strategy"]
+    if strategy == "oldest":
+        files.sort(key=lambda item: (item[1].st_mtime_ns, str(item[0])))
+    elif strategy == "newest":
+        files.sort(key=lambda item: (-item[1].st_mtime_ns, str(item[0])))
+    elif strategy == "largest":
+        files.sort(key=lambda item: (-item[1].st_size, str(item[0])))
+    else:
+        files.sort(key=lambda item: (item[1].st_size, str(item[0])))
+
+    deleted = 0
+    for file_path, original_stat in files:
+        if total_bytes <= threshold:
+            break
+        try:
+            current_stat = file_path.lstat()
+            if (
+                not stat.S_ISREG(current_stat.st_mode)
+                or current_stat.st_dev != original_stat.st_dev
+                or current_stat.st_ino != original_stat.st_ino
+            ):
+                continue
+            file_path.unlink()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            logging.exception("Could not remove file selected by automatic cleanup: %s", file_path)
+            continue
+        total_bytes -= current_stat.st_size
+        deleted += 1
+    return deleted
+
+
+def load_cleanup_policies():
+    try:
+        with CLEANUP_POLICIES_FILE.open("r", encoding="utf-8") as policy_file:
+            data = json.load(policy_file)
+    except FileNotFoundError:
+        return {}
+    if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("folders"), dict):
+        raise ValueError("Automatic cleanup policy file has an invalid format.")
+
+    policies = {}
+    for relative_path, policy in data["folders"].items():
+        if not isinstance(relative_path, str) or not isinstance(policy, dict):
+            raise ValueError("Automatic cleanup policy file has an invalid entry.")
+        if (
+            not isinstance(policy.get("enabled"), bool)
+            or isinstance(policy.get("threshold_bytes"), bool)
+            or not isinstance(policy.get("threshold_bytes"), int)
+            or not 1 <= policy["threshold_bytes"] <= MAX_CLEANUP_THRESHOLD
+            or policy.get("strategy") not in CLEANUP_STRATEGIES
+        ):
+            raise ValueError("Automatic cleanup policy file has an invalid policy.")
+        policies[relative_path] = {
+            "enabled": policy["enabled"],
+            "threshold_bytes": policy["threshold_bytes"],
+            "strategy": policy["strategy"],
+        }
+    return policies
+
+
+def save_cleanup_policy(relative_path, policy):
+    with _cleanup_policies_lock:
+        policies = load_cleanup_policies()
+        policies[relative_path] = policy
+        CLEANUP_POLICIES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=CLEANUP_POLICIES_FILE.parent,
+                prefix=f"{CLEANUP_POLICIES_FILE.name}.",
+                delete=False,
+            ) as policy_file:
+                temporary_path = Path(policy_file.name)
+                json.dump({"version": 1, "folders": policies}, policy_file, indent=2)
+                policy_file.write("\n")
+                policy_file.flush()
+                os.fsync(policy_file.fileno())
+            os.replace(temporary_path, CLEANUP_POLICIES_FILE)
+        finally:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+
+
+def get_cleanup_folder(relative_path):
+    directory = resolve_share_directory(relative_path)
+    _, total_bytes = scan_cleanup_files(directory, include_files=False)
+    policies = load_cleanup_policies()
+    directory_device = directory.stat().st_dev
+    folders = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            entry_stat = os.lstat(entry.path)
+            if not stat.S_ISDIR(entry_stat.st_mode) or not is_same_filesystem(entry_stat, directory_device):
+                continue
+            child_path = f"{relative_path}/{entry.name}" if relative_path else entry.name
+            has_children = False
+            with os.scandir(entry.path) as child_entries:
+                for child in child_entries:
+                    child_stat = os.lstat(child.path)
+                    if stat.S_ISDIR(child_stat.st_mode) and is_same_filesystem(child_stat, directory_device):
+                        has_children = True
+                        break
+            folders.append({
+                "name": entry.name,
+                "path": child_path,
+                "enabled": policies.get(child_path, {}).get("enabled", False),
+                "has_children": has_children,
+            })
+    folders.sort(key=lambda item: item["name"].casefold())
+    return {
+        "path": relative_path,
+        "name": directory.name or str(directory),
+        "size_bytes": total_bytes,
+        "policy": policies.get(relative_path),
+        "has_children": bool(folders),
+        "folders": folders,
+    }
+
+
+def run_auto_cleanup():
+    try:
+        policies = load_cleanup_policies()
+    except (OSError, ValueError, json.JSONDecodeError):
+        logging.exception("Could not load automatic cleanup policies")
+        return
+    for relative_path, policy in sorted(policies.items(), key=lambda item: item[0].count("/"), reverse=True):
+        if not policy["enabled"]:
+            continue
+        try:
+            deleted = cleanup_folder(relative_path, policy)
+            if deleted:
+                logging.info("Automatic cleanup removed %d file(s) from %s", deleted, relative_path or "/")
+        except FileNotFoundError:
+            logging.warning("Automatic cleanup folder no longer exists: %s", relative_path or "/")
+        except (OSError, ValueError):
+            logging.exception("Automatic cleanup failed for %s", relative_path or "/")
+
+
+def automatic_cleanup_worker():
+    while True:
+        run_auto_cleanup()
+        time.sleep(CLEANUP_INTERVAL)
+
+
 class DashboardHandler(BaseHTTPRequestHandler):
     server_version = "PiFiles"
 
@@ -405,7 +608,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_bytes(status, "application/json; charset=utf-8", body)
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
+        if path == "/api/cleanup":
+            query = parse_qs(parsed_url.query, keep_blank_values=True)
+            if set(query) - {"path"} or len(query.get("path", [""])) != 1:
+                self.send_json(400, {"error": "Invalid folder path."})
+                return
+            relative_path = query.get("path", [""])[0]
+            try:
+                resolve_share_directory(relative_path)
+            except FileNotFoundError:
+                self.send_json(404, {"error": "Folder not found."})
+                return
+            except ValueError as error:
+                self.send_json(400, {"error": str(error)})
+                return
+            except OSError:
+                logging.exception("Could not access automatic cleanup folder")
+                self.send_json(503, {"error": "Automatic cleanup information is temporarily unavailable."})
+                return
+            try:
+                self.send_json(200, get_cleanup_folder(relative_path))
+            except (OSError, ValueError, TypeError):
+                logging.exception("Could not read automatic cleanup configuration")
+                self.send_json(503, {"error": "Automatic cleanup information is temporarily unavailable."})
+            return
         if path == "/api/share-credentials":
             try:
                 credentials = {
@@ -452,6 +680,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/icons/temperature.svg": ("static/icons/temperature.svg", "image/svg+xml"),
             "/icons/clock.svg": ("static/icons/clock.svg", "image/svg+xml"),
             "/icons/refresh.svg": ("static/icons/refresh.svg", "image/svg+xml"),
+            "/icons/auto-clean.svg": ("static/icons/auto-clean.svg", "image/svg+xml"),
         }
         asset = static_files.get(path)
         if asset is None:
@@ -467,7 +696,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_bytes(200, content_type, body)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/update":
+        path = urlparse(self.path).path
+        if path == "/api/cleanup":
+            self.save_cleanup_configuration()
+            return
+        if path != "/api/update":
             self.send_json(404, {"error": "Not found."})
             return
 
@@ -492,9 +725,64 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         self.send_json(202, {"status": "Update started."})
 
+    def save_cleanup_configuration(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            self.send_json(400, {"error": "Invalid request body."})
+            return
+        if content_length < 0 or content_length > 4096:
+            self.send_json(413, {"error": "Request body is too large."})
+            return
+        try:
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(400, {"error": "Request body must be valid JSON."})
+            return
+        if not isinstance(payload, dict):
+            self.send_json(400, {"error": "Invalid cleanup policy."})
+            return
+        relative_path = payload.get("path")
+        enabled = payload.get("enabled")
+        threshold = payload.get("threshold_bytes")
+        strategy = payload.get("strategy")
+        if (
+            not isinstance(enabled, bool)
+            or isinstance(threshold, bool)
+            or not isinstance(threshold, int)
+            or not 1 <= threshold <= MAX_CLEANUP_THRESHOLD
+            or strategy not in CLEANUP_STRATEGIES
+        ):
+            self.send_json(400, {"error": "Choose a valid threshold and cleanup strategy."})
+            return
+        try:
+            resolve_share_directory(relative_path)
+        except FileNotFoundError:
+            self.send_json(404, {"error": "Folder not found."})
+            return
+        except ValueError as error:
+            self.send_json(400, {"error": str(error)})
+            return
+        except OSError:
+            logging.exception("Could not access automatic cleanup folder")
+            self.send_json(503, {"error": "Automatic cleanup settings could not be saved."})
+            return
+        try:
+            save_cleanup_policy(relative_path, {
+                "enabled": enabled,
+                "threshold_bytes": threshold,
+                "strategy": strategy,
+            })
+        except (OSError, ValueError):
+            logging.exception("Could not save automatic cleanup policy")
+            self.send_json(503, {"error": "Automatic cleanup settings could not be saved."})
+            return
+        self.send_json(200, {"status": "Automatic cleanup settings saved."})
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    threading.Thread(target=automatic_cleanup_worker, daemon=True, name="automatic-cleanup").start()
     server = ThreadingHTTPServer((HOST, PORT), DashboardHandler)
     logging.info("PiFiles dashboard listening on %s:%s", HOST, PORT)
     server.serve_forever()
