@@ -1,6 +1,6 @@
 <p align="center"><img src="static/favicon.svg" alt="PiFiles favicon" width="64"></p>
 
-# PiFiles 0.5.0
+# PiFiles 0.5.1
 
 PiFiles adds a network file share and a small server status dashboard to a Raspberry Pi or Debian machine. It is intended to sit alongside services you already run, including an existing website. It does not replace your web server or serve your website's content.
 
