@@ -24,10 +24,15 @@ SMB_PASSWORD_FILE = Path("/etc/pifiles-smb-password")
 UPDATE_STATUS = Path("/var/lib/pifiles/update-status")
 UPDATE_LOG = Path("/var/log/pifiles-update.log")
 CLEANUP_POLICIES_FILE = Path(os.environ.get("PIFILES_CLEANUP_CONFIG", "/var/lib/pifiles/cleanup-policies.json"))
+EXTENSION_CLEANUP_FILE = Path(
+    os.environ.get("PIFILES_EXTENSION_CLEANUP_CONFIG", "/var/lib/pifiles/extension-cleanup.json")
+)
 HOST = os.environ.get("PIFILES_HOST", "127.0.0.1")
 PORT = int(os.environ.get("PIFILES_PORT", "8765"))
 CLEANUP_INTERVAL = 60
 MAX_CLEANUP_THRESHOLD = 2**53 - 1
+MAX_EXTENSION_CLEANUP_AGE = 2**53 - 1
+MAX_EXTENSION_CLEANUP_RULES = 100
 CLEANUP_STRATEGIES = {"oldest", "newest", "largest", "smallest"}
 
 _previous_cpu = None
@@ -42,6 +47,7 @@ _storage_snapshot_at = 0.0
 _storage_scan_in_progress = False
 _storage_snapshot_lock = threading.Lock()
 _cleanup_policies_lock = threading.Lock()
+_extension_cleanup_lock = threading.Lock()
 
 STORAGE_SCAN_INTERVAL = 300
 STORAGE_CATEGORIES = (
@@ -467,6 +473,121 @@ def cleanup_folder(relative_path, policy):
     return deleted
 
 
+def validate_extension_cleanup_rules(rules):
+    if not isinstance(rules, list) or len(rules) > MAX_EXTENSION_CLEANUP_RULES:
+        raise ValueError("Provide no more than 100 extension cleanup rules.")
+    validated_rules = []
+    extensions = set()
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise ValueError("Each extension cleanup rule must be an object.")
+        extension = rule.get("extension")
+        age = rule.get("min_age_seconds")
+        if (
+            not isinstance(extension, str)
+            or not extension.startswith(".")
+            or len(extension) < 2
+            or len(extension) > 33
+            or not extension[1].isascii()
+            or not extension[1].isalnum()
+            or any(
+                not (character.isascii() and (character.isalnum() or character in "._+-"))
+                for character in extension[1:]
+            )
+            or isinstance(age, bool)
+            or not isinstance(age, int)
+            or not 1 <= age <= MAX_EXTENSION_CLEANUP_AGE
+        ):
+            raise ValueError("Each rule needs a valid extension and minimum age.")
+        extension = extension.lower()
+        if extension in extensions:
+            raise ValueError("Each extension can only have one cleanup rule.")
+        extensions.add(extension)
+        validated_rules.append({"extension": extension, "min_age_seconds": age})
+    return validated_rules
+
+
+def load_extension_cleanup_rules():
+    try:
+        with EXTENSION_CLEANUP_FILE.open("r", encoding="utf-8") as rules_file:
+            data = json.load(rules_file)
+    except FileNotFoundError:
+        return []
+    if not isinstance(data, dict) or data.get("version") != 1:
+        raise ValueError("Extension cleanup configuration has an invalid format.")
+    return validate_extension_cleanup_rules(data.get("rules"))
+
+
+def save_extension_cleanup_rules(rules):
+    rules = validate_extension_cleanup_rules(rules)
+    with _extension_cleanup_lock:
+        EXTENSION_CLEANUP_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=EXTENSION_CLEANUP_FILE.parent,
+                prefix=f"{EXTENSION_CLEANUP_FILE.name}.",
+                delete=False,
+            ) as rules_file:
+                temporary_path = Path(rules_file.name)
+                json.dump({"version": 1, "rules": rules}, rules_file, indent=2)
+                rules_file.write("\n")
+                rules_file.flush()
+                os.fsync(rules_file.fileno())
+            os.replace(temporary_path, EXTENSION_CLEANUP_FILE)
+        finally:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+
+
+def cleanup_files_by_extension(rules, now=None):
+    if not rules:
+        return 0
+    now = time.time() if now is None else now
+    ordered_rules = sorted(rules, key=lambda rule: len(rule["extension"]), reverse=True)
+    root_device = DATA_DIR.stat().st_dev
+    pending = [DATA_DIR]
+    deleted = 0
+    while pending:
+        current = pending.pop()
+        with os.scandir(current) as entries:
+            for entry in entries:
+                entry_stat = os.lstat(entry.path)
+                if not is_same_filesystem(entry_stat, root_device):
+                    continue
+                if stat.S_ISDIR(entry_stat.st_mode):
+                    pending.append(Path(entry.path))
+                    continue
+                if not stat.S_ISREG(entry_stat.st_mode):
+                    continue
+                rule = next(
+                    (item for item in ordered_rules if entry.name.casefold().endswith(item["extension"])),
+                    None,
+                )
+                if rule is None or entry_stat.st_mtime > now - rule["min_age_seconds"]:
+                    continue
+                file_path = Path(entry.path)
+                try:
+                    current_stat = file_path.lstat()
+                    if (
+                        not stat.S_ISREG(current_stat.st_mode)
+                        or current_stat.st_dev != entry_stat.st_dev
+                        or current_stat.st_ino != entry_stat.st_ino
+                        or current_stat.st_mtime > now - rule["min_age_seconds"]
+                    ):
+                        continue
+                    file_path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    logging.exception("Could not remove file selected by extension cleanup: %s", file_path)
+                    continue
+                deleted += 1
+    return deleted
+
+
 def load_cleanup_policies():
     try:
         with CLEANUP_POLICIES_FILE.open("r", encoding="utf-8") as policy_file:
@@ -562,7 +683,7 @@ def run_auto_cleanup():
         policies = load_cleanup_policies()
     except (OSError, ValueError, json.JSONDecodeError):
         logging.exception("Could not load automatic cleanup policies")
-        return
+        policies = {}
     for relative_path, policy in sorted(policies.items(), key=lambda item: item[0].count("/"), reverse=True):
         if not policy["enabled"]:
             continue
@@ -574,6 +695,13 @@ def run_auto_cleanup():
             logging.warning("Automatic cleanup folder no longer exists: %s", relative_path or "/")
         except (OSError, ValueError):
             logging.exception("Automatic cleanup failed for %s", relative_path or "/")
+    try:
+        rules = load_extension_cleanup_rules()
+        deleted = cleanup_files_by_extension(rules)
+        if deleted:
+            logging.info("Automatic extension cleanup removed %d file(s)", deleted)
+    except (OSError, ValueError, json.JSONDecodeError):
+        logging.exception("Automatic extension cleanup failed")
 
 
 def automatic_cleanup_worker():
@@ -634,6 +762,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 logging.exception("Could not read automatic cleanup configuration")
                 self.send_json(503, {"error": "Automatic cleanup information is temporarily unavailable."})
             return
+        if path == "/api/extension-cleanup":
+            try:
+                self.send_json(200, {"rules": load_extension_cleanup_rules()})
+            except (OSError, ValueError, json.JSONDecodeError):
+                logging.exception("Could not read extension cleanup configuration")
+                self.send_json(503, {"error": "Extension cleanup settings are temporarily unavailable."})
+            return
         if path == "/api/share-credentials":
             try:
                 credentials = {
@@ -681,6 +816,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "/icons/clock.svg": ("static/icons/clock.svg", "image/svg+xml"),
             "/icons/refresh.svg": ("static/icons/refresh.svg", "image/svg+xml"),
             "/icons/auto-clean.svg": ("static/icons/auto-clean.svg", "image/svg+xml"),
+            "/icons/age-clean.svg": ("static/icons/age-clean.svg", "image/svg+xml"),
         }
         asset = static_files.get(path)
         if asset is None:
@@ -699,6 +835,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/cleanup":
             self.save_cleanup_configuration()
+            return
+        if path == "/api/extension-cleanup":
+            self.save_extension_cleanup_configuration()
             return
         if path != "/api/update":
             self.send_json(404, {"error": "Not found."})
@@ -778,6 +917,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_json(503, {"error": "Automatic cleanup settings could not be saved."})
             return
         self.send_json(200, {"status": "Automatic cleanup settings saved."})
+
+    def save_extension_cleanup_configuration(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            self.send_json(400, {"error": "Invalid request body."})
+            return
+        if content_length < 0 or content_length > 8192:
+            self.send_json(413, {"error": "Request body is too large."})
+            return
+        try:
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(400, {"error": "Request body must be valid JSON."})
+            return
+        if not isinstance(payload, dict):
+            self.send_json(400, {"error": "Invalid extension cleanup settings."})
+            return
+        try:
+            rules = validate_extension_cleanup_rules(payload.get("rules"))
+            save_extension_cleanup_rules(rules)
+        except ValueError as error:
+            self.send_json(400, {"error": str(error)})
+            return
+        except OSError:
+            logging.exception("Could not save extension cleanup configuration")
+            self.send_json(503, {"error": "Extension cleanup settings could not be saved."})
+            return
+        self.send_json(200, {"status": "Extension cleanup settings saved.", "rules": rules})
 
 
 if __name__ == "__main__":

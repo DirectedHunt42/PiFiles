@@ -1,6 +1,6 @@
 <p align="center"><img src="static/favicon.svg" alt="PiFiles favicon" width="64"></p>
 
-# PiFiles 0.4.9
+# PiFiles 0.5.0
 
 PiFiles adds a network file share and a small server status dashboard to a Raspberry Pi or Debian machine. It is intended to sit alongside services you already run, including an existing website. It does not replace your web server or serve your website's content.
 
@@ -10,6 +10,7 @@ PiFiles adds a network file share and a small server status dashboard to a Raspb
 - A browser dashboard for share and disk usage, CPU, memory, temperature, load, and uptime.
 - A storage chart that estimates how disk space is being used.
 - Optional automatic cleanup policies for individual shared folders, based on a size limit and file age or size ordering.
+- Optional automatic cleanup rules for files with selected extensions after a minimum modification age.
 - A dashboard button for updating PiFiles from its Git repository.
 - A separate data directory for shared files, so application updates do not overwrite them.
 
@@ -90,6 +91,8 @@ The dashboard refreshes system status automatically. Disk usage describes the fi
 ### Automatic folder cleanup
 
 Select a folder in the dashboard's **Automatic folder cleanup** tree, enable its policy, choose a maximum folder size, and select which files to remove first: oldest or newest by modification time, or largest or smallest by file size. Once a folder exceeds its limit, PiFiles checks it about once a minute and deletes regular files until the folder is back under the limit. Directories are never deleted; symbolic links are neither followed nor deleted. Cleanup is permanent; keep backups of important files. The dashboard can delete share files, so only expose it to trusted users and networks.
+
+In **Automatic file-age cleanup**, add extension rules with a minimum age, such as `.tmp` older than 30 minutes. PiFiles checks the shared files directory (the configured `/srv/pifiles` directory by default), including its subdirectories, about once a minute and deletes matching regular files based on their last-modified time. This does not affect files outside the shared files directory. Symbolic links are neither followed nor deleted. Cleanup is permanent; keep backups of important files.
 
 ## Updates
 

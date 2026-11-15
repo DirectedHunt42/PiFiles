@@ -19,8 +19,8 @@
       </a>
       <div class="topbar-actions">
         <span class="live"><span class="live-dot"></span>Live</span>
-        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.4.9">
-          <span>GitHub repo</span><span class="github-version">v0.4.9</span>
+        <a class="github-link" href="https://github.com/DirectedHunt42/PiFiles" aria-label="PiFiles on GitHub, version 0.5.0">
+          <span>GitHub repo</span><span class="github-version">v0.5.0</span>
         </a>
         <button class="button button-muted" id="refresh-button" type="button">
           <svg class="button-icon" aria-hidden="true"><use href="/icons/refresh.svg#icon"></use></svg>
@@ -207,6 +207,41 @@
       </div>
     </section>
 
+    <section class="cleanup-card extension-cleanup-card" aria-labelledby="extension-cleanup-title">
+      <div class="cleanup-header">
+        <div>
+          <p class="eyebrow">SHARED FILES</p>
+          <h2 id="extension-cleanup-title"><svg class="icon" aria-hidden="true"><use href="/icons/age-clean.svg#icon"></use></svg><span>Automatic file-age cleanup</span></h2>
+          <p class="cleanup-summary">Remove files with selected extensions once they reach a minimum age.</p>
+        </div>
+      </div>
+      <form class="extension-cleanup-form" id="extension-cleanup-form">
+        <label class="cleanup-field">
+          <span>File extension</span>
+          <input id="extension-cleanup-extension" type="text" placeholder=".tmp" pattern="\.[A-Za-z0-9][A-Za-z0-9._+-]{0,31}" maxlength="33" required>
+        </label>
+        <label class="cleanup-field">
+          <span>Minimum age</span>
+          <span class="cleanup-size-input">
+            <input id="extension-cleanup-age" type="number" min="1" max="150119987579016" step="1" value="30" required>
+            <select id="extension-cleanup-unit" aria-label="Minimum age unit">
+              <option value="1">seconds</option>
+              <option value="60" selected>minutes</option>
+              <option value="3600">hours</option>
+              <option value="86400">days</option>
+            </select>
+          </span>
+        </label>
+        <button class="button button-primary" id="extension-cleanup-add" type="submit">Add extension rule</button>
+      </form>
+      <div class="extension-cleanup-rules">
+        <h3>Active rules</h3>
+        <div class="extension-rule-list" id="extension-cleanup-rules" aria-live="polite">Loading rules…</div>
+      </div>
+      <p class="cleanup-warning">Rules are checked about once a minute and permanently delete matching files. Directories and symbolic links are not deleted. Keep backups of important data.</p>
+      <p class="cleanup-message" id="extension-cleanup-message" role="status" aria-live="polite"></p>
+    </section>
+
     <section class="update-card">
       <div class="update-copy">
         <p class="eyebrow">MAINTENANCE</p>
@@ -228,7 +263,7 @@
       </div>
       <pre id="license-content" aria-live="polite">Loading license…</pre>
     </dialog>
-    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.4.9</span></footer>
+    <footer>Files are stored on this Pi only. Keep a separate backup for important data. <button class="license-trigger" id="license-open" type="button">View license</button><span class="version">v0.5.0</span></footer>
   </main>
 </body>
 </html>

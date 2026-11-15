@@ -12,9 +12,11 @@ class CleanupTests(unittest.TestCase):
         self.addCleanup(self.temporary_directory.cleanup)
         app.DATA_DIR = Path(self.temporary_directory.name) / "share"
         app.DATA_DIR.mkdir()
+        app.EXTENSION_CLEANUP_FILE = Path(self.temporary_directory.name) / "extension-cleanup.json"
 
     def make_file(self, name, size, modified):
         path = app.DATA_DIR / name
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"x" * size)
         os.utime(path, (modified, modified))
         return path
@@ -83,6 +85,45 @@ class CleanupTests(unittest.TestCase):
     def test_rejects_parent_path_segments(self):
         with self.assertRaises(ValueError):
             app.resolve_share_directory("../outside")
+
+    def test_removes_matching_files_older_than_minimum_age_recursively(self):
+        now = 50000
+        old_file = self.make_file("old.TMP", 1, now - 1801)
+        boundary_file = self.make_file("nested/boundary.tmp", 1, now - 1800)
+        recent_file = self.make_file("recent.tmp", 1, now - 1799)
+        other_file = self.make_file("other.log", 1, now - 9000)
+        outside_file = Path(self.temporary_directory.name) / "outside.tmp"
+        outside_file.write_text("outside")
+        os.utime(outside_file, (now - 9000, now - 9000))
+
+        deleted = app.cleanup_files_by_extension(
+            [{"extension": ".tmp", "min_age_seconds": 1800}],
+            now=now,
+        )
+
+        self.assertEqual(deleted, 2)
+        self.assertFalse(old_file.exists())
+        self.assertFalse(boundary_file.exists())
+        self.assertTrue(recent_file.exists())
+        self.assertTrue(other_file.exists())
+        self.assertTrue(outside_file.exists())
+
+    def test_extension_rules_are_case_insensitive_and_saved_normalized(self):
+        app.save_extension_cleanup_rules([{"extension": ".TMP", "min_age_seconds": 30}])
+
+        self.assertEqual(
+            app.load_extension_cleanup_rules(),
+            [{"extension": ".tmp", "min_age_seconds": 30}],
+        )
+
+    def test_rejects_duplicate_extensions_and_invalid_ages(self):
+        with self.assertRaises(ValueError):
+            app.validate_extension_cleanup_rules([
+                {"extension": ".tmp", "min_age_seconds": 30},
+                {"extension": ".TMP", "min_age_seconds": 60},
+            ])
+        with self.assertRaises(ValueError):
+            app.validate_extension_cleanup_rules([{"extension": ".tmp", "min_age_seconds": True}])
 
 
 if __name__ == "__main__":

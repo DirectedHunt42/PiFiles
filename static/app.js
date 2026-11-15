@@ -477,6 +477,119 @@ async function saveCleanupSettings(event) {
   }
 }
 
+let extensionCleanupRules = [];
+
+function formatMinimumAge(seconds) {
+  const units = [
+    { value: 86400, label: "day" },
+    { value: 3600, label: "hour" },
+    { value: 60, label: "minute" },
+    { value: 1, label: "second" },
+  ];
+  const unit = units.find((item) => seconds >= item.value && seconds % item.value === 0);
+  const count = seconds / (unit?.value || 1);
+  const label = unit?.label || "second";
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function setExtensionCleanupFormDisabled(disabled) {
+  document.querySelectorAll(
+    "#extension-cleanup-form input, #extension-cleanup-form select, #extension-cleanup-form button, .extension-rule-remove",
+  ).forEach((element) => { element.disabled = disabled; });
+}
+
+function updateExtensionAgeLimit() {
+  const unit = Number(document.getElementById("extension-cleanup-unit").value);
+  const ageInput = document.getElementById("extension-cleanup-age");
+  const maximum = Math.floor(Number.MAX_SAFE_INTEGER / unit);
+  ageInput.max = String(maximum);
+  if (Number(ageInput.value) > maximum) ageInput.value = String(maximum);
+}
+
+function renderExtensionCleanupRules() {
+  const container = document.getElementById("extension-cleanup-rules");
+  if (!extensionCleanupRules.length) {
+    container.textContent = "No extension cleanup rules configured.";
+    return;
+  }
+  const list = document.createElement("ul");
+  list.className = "extension-rule-items";
+  extensionCleanupRules.forEach((rule) => {
+    const item = document.createElement("li");
+    item.className = "extension-rule";
+    const description = document.createElement("span");
+    description.textContent = `${rule.extension} — older than ${formatMinimumAge(rule.min_age_seconds)}`;
+    const remove = document.createElement("button");
+    remove.className = "button button-muted extension-rule-remove";
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove cleanup rule for ${rule.extension}`);
+    remove.addEventListener("click", () => {
+      saveExtensionCleanupRules(extensionCleanupRules.filter((entry) => entry.extension !== rule.extension));
+    });
+    item.append(description, remove);
+    list.append(item);
+  });
+  container.replaceChildren(list);
+}
+
+async function loadExtensionCleanupRules() {
+  const message = document.getElementById("extension-cleanup-message");
+  try {
+    const response = await fetch("/api/extension-cleanup", { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Rule request failed (${response.status})`);
+    extensionCleanupRules = result.rules;
+    renderExtensionCleanupRules();
+  } catch (error) {
+    document.getElementById("extension-cleanup-rules").textContent = `Rules unavailable. ${error.message}`;
+  }
+}
+
+async function saveExtensionCleanupRules(rules) {
+  const message = document.getElementById("extension-cleanup-message");
+  setExtensionCleanupFormDisabled(true);
+  message.textContent = "Saving…";
+  try {
+    const response = await fetch("/api/extension-cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Save failed (${response.status})`);
+    extensionCleanupRules = result.rules;
+    renderExtensionCleanupRules();
+    message.textContent = result.status;
+    return true;
+  } catch (error) {
+    message.textContent = error.message;
+    return false;
+  } finally {
+    setExtensionCleanupFormDisabled(false);
+  }
+}
+
+async function addExtensionCleanupRule(event) {
+  event.preventDefault();
+  const extensionInput = document.getElementById("extension-cleanup-extension");
+  const age = Number(document.getElementById("extension-cleanup-age").value);
+  const unit = Number(document.getElementById("extension-cleanup-unit").value);
+  const minAgeSeconds = age * unit;
+  if (!Number.isSafeInteger(minAgeSeconds) || minAgeSeconds < 1) {
+    document.getElementById("extension-cleanup-message").textContent = "Enter a valid minimum age.";
+    return;
+  }
+  const saved = await saveExtensionCleanupRules([
+    ...extensionCleanupRules,
+    { extension: extensionInput.value.toLowerCase(), min_age_seconds: minAgeSeconds },
+  ]);
+  if (saved) {
+    extensionInput.value = "";
+    extensionInput.focus();
+  }
+}
+
 let licenseLoaded = false;
 let licenseLoading = false;
 
@@ -506,6 +619,8 @@ async function showLicense() {
 document.getElementById("refresh-button").addEventListener("click", loadStats);
 document.getElementById("update-button").addEventListener("click", startUpdate);
 document.getElementById("cleanup-form").addEventListener("submit", saveCleanupSettings);
+document.getElementById("extension-cleanup-form").addEventListener("submit", addExtensionCleanupRule);
+document.getElementById("extension-cleanup-unit").addEventListener("change", updateExtensionAgeLimit);
 document.getElementById("license-open").addEventListener("click", showLicense);
 document.getElementById("license-close").addEventListener("click", () => {
   document.getElementById("license-dialog").close();
@@ -517,6 +632,8 @@ licenseDialog.addEventListener("click", (event) => {
 });
 loadStats();
 loadCleanupFolder("");
+loadExtensionCleanupRules();
+updateExtensionAgeLimit();
 loadShareCredentials();
 loadUpdateStatus();
 window.setInterval(loadStats, 5000);

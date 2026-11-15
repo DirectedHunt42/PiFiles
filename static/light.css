@@ -115,6 +115,14 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 650; letter-spac
 .cleanup-field > select { width: 100%; }
 .cleanup-warning { padding-top: 3px; }
 .cleanup-form .button { align-self: flex-start; }
+.extension-cleanup-card { display: grid; gap: 14px; }
+.extension-cleanup-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.extension-cleanup-form .button { min-height: 34px; }
+.extension-cleanup-rules h3 { margin: 0 0 8px; font-size: 13px; font-weight: 650; }
+.extension-rule-list { color: var(--muted); font-size: 11px; }
+.extension-rule-items { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.extension-rule { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.extension-rule .button { flex: 0 0 auto; padding: 5px 8px; font-size: 10px; }
 .update-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 24px; margin-top: 23px; padding: 18px; border: 1px solid var(--border); }
 .update-copy h2 { margin: 0; font-size: 16px; font-weight: 650; }
 .update-copy > p:last-child { max-width: 580px; margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
@@ -140,6 +148,7 @@ footer { padding: 18px 0 25px; color: var(--muted); text-align: center; font-siz
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .credentials-card { grid-template-columns: 1fr; }
   .cleanup-content { grid-template-columns: 1fr; }
+  .extension-cleanup-form { grid-template-columns: 1fr; }
   .update-card { grid-template-columns: 1fr; }
   .update-controls { justify-content: flex-start; }
 }
